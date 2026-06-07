@@ -1,26 +1,26 @@
 # 🔐 Enterprise Password Saver — Powered by HashiCorp Vault & Jenkins
 
-A **self-service, zero-trust credential vault** for teams and automation pipelines. Store, retrieve, and rotate operational secrets (database passwords, API keys, SSH credentials) through a hardened HashiCorp Vault backend — with Jenkins as the automation engine and a CLI tool for terminal-native workflows.
+A **self-service, zero-trust credential vault** for teams and automation pipelines. Store, retrieve, and rotate operational secrets (database passwords, API keys, SSH credentials) through a hardened HashiCorp Vault backend. This project features an Express/Node.js API, a beautiful Tailwind CSS Web UI Dashboard, Jenkins CI/CD automation, and Docker Compose orchestration.
 
 > **Pivoted from:** Azure Infrastructure Secret Management  
 > **Pivoted to:** General-purpose Enterprise Password Saver — any secret, any team, any service.
 
 ---
 
-## 🚀 Quick Start (One Command Setup)
+## 🚀 Quick Start (Web App Stack via Docker Compose)
 
-Run the master orchestration script on your Ubuntu machine to install, configure, and validate the entire stack:
+The easiest way to run the entire unified application stack (Vault Backend + Node.js API + Web Dashboard) is using Docker Compose:
 
 ```bash
-bash scripts/setup-all.sh
-```
+# 1. Spin up the application stack
+docker compose up -d
 
-This script will:
-- Install Vault & register the `vault.service` systemd unit
-- Initialize, unseal, and configure the KV-V2 secrets engine
-- Apply the Password Saver access policy
-- Configure the Jenkins AppRole and output credentials
-- Seed a sample credential and perform a read-back parity check
+# 2. Verify containers are running healthy
+docker compose ps
+
+# 3. Access the web interface
+# Open http://localhost:3000 in your web browser
+```
 
 ---
 
@@ -33,35 +33,37 @@ This script will:
 | No audit trail when a secret is accessed | **Vault audit log** — every read/write timestamped with identity |
 | Rotating a password means updating 10 places | **Update in Vault once**, all consumers get it instantly |
 | No access control on who can see what | **HCL policies** enforce least-privilege per path |
+| Cumbersome CLI interfaces for non-technical users | **Glassmorphism Web UI** for simple Encrypt/Decrypt ops |
 
 ---
 
 ## 🏗️ Technical Architecture
 
-The workflow uses a **Machine-to-Machine (M2M)** handshake called **AppRole**:
+The workflow uses a **Machine-to-Machine (M2M)** handshake called **AppRole** along with an Express Middleware Broker:
 
 | Step | Actor | Action |
 | :--: | :--- | :--- |
-| **1** | Jenkins | Presents **RoleID + SecretID** → Vault authenticates |
-| **2** | Vault | Issues a **short-lived token** (20-min TTL) |
+| **1** | Frontend/Jenkins | Sends a payload to the App Backend / Presents **RoleID + SecretID** |
+| **2** | Vault | Issues a **short-lived token** (20-min TTL) to the Backend/Jenkins |
 | **3** | Vault | Checks attached **Policy** → grants CRUD on `app-passwords/*` |
-| **4** | Jenkins | Executes **STORE** or **RETRIEVE** based on build parameter |
+| **4** | App/Jenkins | Executes **STORE** or **RETRIEVE** action against the KV engine |
 | **5** | Vault | Writes/reads the KV secret; logs the operation |
-| **6** | Jenkins | Workspace wiped; token expires — **zero footprint** |
+| **6** | App/Jenkins | Vault token is never exposed to the frontend browser; Jenkins wipes workspace |
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   Jenkins Pipeline                       │
-│  ┌──────────────┐         ┌────────────────────────┐    │
-│  │  Parameters  │─────────▶  withVault() wrapper   │    │
-│  │  ACTION      │         │  AppRole Authentication │    │
-│  │  SECRET_PATH │         └──────────┬─────────────┘    │
-│  │  SECRET_KEY  │                    │                   │
-│  │  SECRET_VALUE│         ┌──────────▼─────────────┐    │
-│  └──────────────┘         │   HashiCorp Vault KV   │    │
-│                            │  internal/app-passwords│    │
-│                            └────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                    Enterprise Password Saver                  │
+│                                                               │
+│  ┌────────────────┐     ┌───────────────┐      ┌───────────┐  │
+│  │ Web Dashboard  │────▶│ Express API   │─────▶│ HashiCorp │  │
+│  │ (Tailwind UI)  │◀────│ (Middleware)  │◀─────│ Vault KV  │  │
+│  └────────────────┘     └───────────────┘      └───────────┘  │
+│                                                      ▲        │
+│  ┌────────────────┐     ┌───────────────┐            │        │
+│  │ CLI Tool       │────▶│ Jenkins CI/CD │────────────┘        │
+│  │ (vault-vault)  │     │ (AppRole Auth)│                     │
+│  └────────────────┘     └───────────────┘                     │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -70,29 +72,26 @@ The workflow uses a **Machine-to-Machine (M2M)** handshake called **AppRole**:
 
 | Deliverable | File | Purpose |
 | :--- | :--- | :--- |
-| **Password Vault Pipeline** | `jenkins/Jenkinsfile` | Parameterized STORE/RETRIEVE pipeline |
+| **Web API Backend** | `server.js` | Express broker to authenticate with Vault and serve the frontend |
+| **Web Frontend UI** | `public/index.html` | Tailwind/Glassmorphism interface for managing secrets |
+| **Orchestration** | `docker-compose.yml` | Packages Vault and the Node.js App into a single stack |
+| **Password Vault Pipeline** | `jenkins/Jenkinsfile` | Parameterized STORE/RETRIEVE pipeline for Jenkins |
 | **Access Policy** | `vault/policies/password-saver-policy.hcl` | CRUD policy for `app-passwords/*` |
 | **Legacy Policy** | `vault/policies/jenkins-policy.hcl` | Same policy, kept for AppRole binding |
 | **CLI Utility** | `scripts/vault-vault.sh` | Terminal-native store/get commands |
-| **Vault Config** | `scripts/vault-config.sh` | Automates KV engine + AppRole setup |
-| **Master Setup** | `scripts/setup-all.sh` | Full one-command bootstrap |
+| **Master Setup** | `scripts/setup-all.sh` | Legacy full one-command bootstrap for standalone Vault |
 
 ---
 
-## 🛠️ Setup Phases
+## 🛠️ Bare-Metal Setup Phases (Alternative to Docker)
+
+If you prefer to run Vault directly on a Linux host rather than via Docker, follow these steps:
 
 ### Phase 1 — Vault Host Foundation
 
 ```bash
-bash scripts/vault-setup.sh          # Install Vault + systemd
-sudo systemctl start vault           # Start the service
-vault operator init                  # CRITICAL: save the 5 unseal keys + root token
-vault operator unseal                # Run 3× with 3 different keys
-export VAULT_TOKEN="<root-token>"
-vault login $VAULT_TOKEN
+bash scripts/setup-all.sh            # Install, Init, and Unseal Vault
 ```
-
----
 
 ### Phase 2 & 3 — Automated Vault Configuration
 
@@ -105,7 +104,7 @@ This script:
 2. Enables AppRole auth
 3. Applies `password-saver-policy.hcl` as `jenkins-policy`
 4. Creates the `jenkins-role` AppRole
-5. **Outputs the Role ID and Secret ID** — save these for Phase 4
+5. **Outputs the Role ID and Secret ID**
 
 ---
 
@@ -152,42 +151,20 @@ chmod +x scripts/vault-vault.sh
 **Retrieve a secret:**
 ```bash
 ./scripts/vault-vault.sh get production/database root_pass
-./scripts/vault-vault.sh get staging/redis       cache_key
-```
-
----
-
-### Phase 7 — Validation & Audit
-
-```bash
-# 1. Load the access policy
-vault policy write jenkins-policy vault/policies/password-saver-policy.hcl
-
-# 2. Write a test credential
-vault kv put internal/app-passwords/production/database root_pass="UltraSecureProduction2026!"
-
-# 3. Read it back and confirm parity
-vault kv get -field=root_pass internal/app-passwords/production/database
-
-# 4. List all secrets at a path
-vault kv list internal/app-passwords/production/
-
-# 5. Check version history for a secret
-vault kv metadata get internal/app-passwords/production/database
 ```
 
 ---
 
 ## ✅ Definition of Done
 
-- [x] Vault is running as a hardened `systemd` service
-- [x] Secrets are **never** stored in Jenkins UI, disk files, or build logs
-- [x] Jenkins authenticates using short-lived AppRole tokens
-- [x] Pipeline dynamically **stores** or **retrieves** any credential via parameters
-- [x] Secret values are **masked** in all Jenkins console output
-- [x] Workspace is wiped and env vars unset after every build
-- [x] CLI utility enables terminal-native secret management
-- [x] KV-V2 provides **full version history** for every stored secret
+- [x] Application orchestrated securely via `docker-compose.yml`.
+- [x] Modern Web Interface provided for easy user interactions.
+- [x] Secrets are **never** stored in Jenkins UI, disk files, or build logs.
+- [x] Express middleware strictly masks Vault API tokens from the frontend.
+- [x] Pipeline dynamically **stores** or **retrieves** any credential via parameters.
+- [x] Secret values are **masked** in all Jenkins console output.
+- [x] CLI utility enables terminal-native secret management.
+- [x] KV-V2 provides **full version history** for every stored secret.
 
 ---
 
@@ -196,7 +173,7 @@ vault kv metadata get internal/app-passwords/production/database
 | Control | Implementation |
 | :--- | :--- |
 | **Encryption at rest** | Vault AES-256-GCM (default) |
-| **Encryption in transit** | Vault API over localhost (production: TLS) |
+| **Token masking** | Express middleware hides the Vault Token from the browser |
 | **Least privilege** | HCL policy scoped strictly to `app-passwords/*` |
 | **Secret masking** | `MaskPasswordsBuildWrapper` + `password` param type |
 | **Token expiry** | 20-min TTL, 10-use limit per AppRole token |
@@ -207,6 +184,5 @@ vault kv metadata get internal/app-passwords/production/database
 
 ## 💡 Senior Engineer Notes
 
-- **Secret rotation** is a one-time Vault update — `vault kv put` with the new value. Every pipeline and CLI consumer gets the new secret on next read, with no `Jenkinsfile` changes required.
-- **KV-V2 versioning** means you can roll back to a previous version of any secret with `vault kv rollback`.
 - **Namespace isolation:** Add team-scoped paths (`app-passwords/team-a/*`, `app-passwords/team-b/*`) and create separate policies per team for multi-tenant credential management.
+- **Production Mode:** The `docker-compose.yml` configures Vault in Dev Mode for quick startup. For production, transition to a sealed Vault config using an unseal key quorum or cloud auto-unseal.
