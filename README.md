@@ -1,115 +1,212 @@
-This project, **"Secret Management with HashiCorp Vault,"** is the transition from "it works" to "it's production-secure." 
+# 🔐 Enterprise Password Saver — Powered by HashiCorp Vault & Jenkins
 
-### **🚀 Quick Start (One Command Setup)**
-If you want to automate the entire installation, configuration, and secret-seeding process on your Ubuntu machine, run:
+A **self-service, zero-trust credential vault** for teams and automation pipelines. Store, retrieve, and rotate operational secrets (database passwords, API keys, SSH credentials) through a hardened HashiCorp Vault backend — with Jenkins as the automation engine and a CLI tool for terminal-native workflows.
+
+> **Pivoted from:** Azure Infrastructure Secret Management  
+> **Pivoted to:** General-purpose Enterprise Password Saver — any secret, any team, any service.
+
+---
+
+## 🚀 Quick Start (One Command Setup)
+
+Run the master orchestration script on your Ubuntu machine to install, configure, and validate the entire stack:
+
 ```bash
 bash scripts/setup-all.sh
 ```
-This script will guide you through:
-- Installing Vault & Systemd Service.
-- Initializing and Unsealing the Vault.
-- Configuring AppRole and Policies.
-- Seeding your Azure Credentials.
+
+This script will:
+- Install Vault & register the `vault.service` systemd unit
+- Initialize, unseal, and configure the KV-V2 secrets engine
+- Apply the Password Saver access policy
+- Configure the Jenkins AppRole and output credentials
+- Seed a sample credential and perform a read-back parity check
 
 ---
 
-In your previous projects, you likely stored credentials directly in Jenkins as "Secret Text." This project replaces that static, persistent model with a **Zero-Trust** approach where secrets are ephemeral (they exist only during the job) and dynamic.
+## 🧠 The "Why" Behind the Project
 
-### **The "Why" Behind the Project**
-1.  **Eliminate Secret Sprawl:** Instead of Azure credentials living in Jenkins, Terraform, and developer machines, they live in **one** central, encrypted source (Vault).
-2.  **Blast Radius Reduction:** If your Jenkins server is compromised, an attacker finds a `RoleID` and a `SecretID` that are useless without the other, or a token that expires in minutes. They don't get your permanent Azure root keys.
-3.  **Auditability:** Every time Jenkins requests a secret, Vault logs the exact timestamp and the "Identity" that requested it. You get a full audit trail for compliance.
+| Problem | This Project's Solution |
+| :--- | :--- |
+| Passwords scattered across Slack, `.env` files, spreadsheets | **One encrypted source of truth** — Vault KV-V2 |
+| Credentials leaked in CI/CD logs | **MaskPasswordsBuildWrapper** + ephemeral env vars |
+| No audit trail when a secret is accessed | **Vault audit log** — every read/write timestamped with identity |
+| Rotating a password means updating 10 places | **Update in Vault once**, all consumers get it instantly |
+| No access control on who can see what | **HCL policies** enforce least-privilege per path |
 
 ---
 
-### **The Technical Architecture**
+## 🏗️ Technical Architecture
 
-The workflow follows a **Machine-to-Machine (M2M)** handshake called **AppRole**:
+The workflow uses a **Machine-to-Machine (M2M)** handshake called **AppRole**:
 
-| Step | Action | Logic |
+| Step | Actor | Action |
+| :--: | :--- | :--- |
+| **1** | Jenkins | Presents **RoleID + SecretID** → Vault authenticates |
+| **2** | Vault | Issues a **short-lived token** (20-min TTL) |
+| **3** | Vault | Checks attached **Policy** → grants CRUD on `app-passwords/*` |
+| **4** | Jenkins | Executes **STORE** or **RETRIEVE** based on build parameter |
+| **5** | Vault | Writes/reads the KV secret; logs the operation |
+| **6** | Jenkins | Workspace wiped; token expires — **zero footprint** |
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Jenkins Pipeline                       │
+│  ┌──────────────┐         ┌────────────────────────┐    │
+│  │  Parameters  │─────────▶  withVault() wrapper   │    │
+│  │  ACTION      │         │  AppRole Authentication │    │
+│  │  SECRET_PATH │         └──────────┬─────────────┘    │
+│  │  SECRET_KEY  │                    │                   │
+│  │  SECRET_VALUE│         ┌──────────▼─────────────┐    │
+│  └──────────────┘         │   HashiCorp Vault KV   │    │
+│                            │  internal/app-passwords│    │
+│                            └────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📦 Project Deliverables
+
+| Deliverable | File | Purpose |
 | :--- | :--- | :--- |
-| **1. Authenticate** | Jenkins presents its **RoleID** and **SecretID** to Vault. | Think of this as a "Service Account" login. |
-| **2. Issue Token** | Vault validates the IDs and gives Jenkins a **short-lived token**. | This token usually expires as soon as the Jenkins job ends. |
-| **3. Authorize** | Vault checks the **Policy** attached to that token. | "Can this job read `internal/azure-creds`? Yes." |
-| **4. Inject** | The Vault Plugin injects the secrets as **Environment Variables**. | `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, etc., are now available to Terraform. |
-| **5. Execute** | Terraform runs, uses the variables, and completes the deploy. | Terraform doesn't even know Vault exists; it just sees the variables. |
-| **6. Purge** | The Jenkins job finishes, and the secrets vanish from memory. | The "Zero-Footprint" goal is achieved. |
+| **Password Vault Pipeline** | `jenkins/Jenkinsfile` | Parameterized STORE/RETRIEVE pipeline |
+| **Access Policy** | `vault/policies/password-saver-policy.hcl` | CRUD policy for `app-passwords/*` |
+| **Legacy Policy** | `vault/policies/jenkins-policy.hcl` | Same policy, kept for AppRole binding |
+| **CLI Utility** | `scripts/vault-vault.sh` | Terminal-native store/get commands |
+| **Vault Config** | `scripts/vault-config.sh` | Automates KV engine + AppRole setup |
+| **Master Setup** | `scripts/setup-all.sh` | Full one-command bootstrap |
 
 ---
 
-### **Project Deliverables**
-To call this project "Complete," we will build:
-* **A Hardened Vault Instance:** Running on Ubuntu with a restricted systemd service.
-* **The KV-V2 Secrets Engine:** A version-controlled store for your Azure Service Principal.
-* **The AppRole Auth Backend:** The bridge between Jenkins and Vault.
-* **Scoped Policies:** HCL files that define "Least Privilege" (e.g., Jenkins can *read* Azure secrets but cannot *delete* them).
-* **A Secure Jenkins Pipeline:** A `Jenkinsfile` that uses the `withVault` wrapper to pull secrets on-the-fly.
+## 🛠️ Setup Phases
 
-### **Senior Engineer Tip**
-In this project, we aren't just "storing a password." We are building an **Identity Broker**. If you ever need to rotate your Azure credentials, you update them in **one place** (Vault), and every Jenkins pipeline globally is instantly updated without touching a single `Jenkinsfile`.
+### Phase 1 — Vault Host Foundation
 
-**Where should we start?** 1.  **The Infrastructure:** Installing and configuring Vault on your Ubuntu machine.
-2.  **The Logic:** Writing the Policies and AppRole configurations.
-3.  **The Integration:** Setting up the Jenkins Plugin and Pipeline.
-
+```bash
+bash scripts/vault-setup.sh          # Install Vault + systemd
+sudo systemctl start vault           # Start the service
+vault operator init                  # CRITICAL: save the 5 unseal keys + root token
+vault operator unseal                # Run 3× with 3 different keys
+export VAULT_TOKEN="<root-token>"
+vault login $VAULT_TOKEN
+```
 
 ---
 
-Building this project follows a logical flow from **Infrastructure** (Vault setup) to **Security Logic** (Policies/Auth) and finally **CI/CD Integration** (Jenkins).
+### Phase 2 & 3 — Automated Vault Configuration
 
-Here is the step-by-step roadmap to build **Project 4**.
+```bash
+bash scripts/vault-config.sh
+```
 
-
-----------------------------------------
-
-
-### **Phase 1: The Foundation (Vault Host Setup)**
-Before Jenkins can talk to Vault, the Vault server must be stable and accessible.
-1.  **Install Vault & Service:** Run `bash scripts/vault-setup.sh`. This installs Vault and registers the `vault.service`.
-2.  **Start Vault:** `sudo systemctl start vault`.
-3.  **Initialization (Manual):** Run `vault operator init`. 
-    *   **CRITICAL:** Save the 5 Unseal Keys and the Root Token in a secure location (e.g., a physical safe or a team password manager).
-4.  **Unsealing (Manual):** Run `vault operator unseal` 3 times using 3 different keys to "open" the vault for use.
-5.  **Log In:** `export VAULT_TOKEN="your-root-token"` then `vault login $VAULT_TOKEN`.
+This script:
+1. Enables KV-V2 at `internal/`
+2. Enables AppRole auth
+3. Applies `password-saver-policy.hcl` as `jenkins-policy`
+4. Creates the `jenkins-role` AppRole
+5. **Outputs the Role ID and Secret ID** — save these for Phase 4
 
 ---
 
-### **Phase 2 & 3: Automated Logic (Vault Internal)**
-We have automated the KV engine, Policies, and AppRole setup.
-1.  **Run Config Script:** `bash scripts/vault-config.sh`.
-2.  **Capture IDs:** The script will output a **Role ID** and a **Secret ID**. Keep these for Phase 4.
-3.  **Seed Secrets:** Use the command provided at the end of the script to store your actual Azure Service Principal details.
+### Phase 4 — Jenkins Integration
+
+1. **Install Plugin:** `HashiCorp Vault Plugin` in Jenkins Plugin Manager
+2. **Add Credentials:** Jenkins → Manage Credentials → *Vault App Role Credential*
+   - Role ID and Secret ID from Phase 3
+   - Credential ID: **`vault-approle-id`**
+3. **Configure System:** Jenkins → Configure System → Vault → URL: `http://127.0.0.1:8200`
 
 ---
 
-### **Phase 4: Jenkins Integration (The Bridge)**
-1.  **Install Plugin:** Install the **HashiCorp Vault Plugin** in Jenkins.
-2.  **Add Credentials:** In Jenkins "Manage Credentials," add a new credential of type **Vault App Role Credential**. 
-    *   Input the `Role ID` and `Secret ID` gathered in Phase 2.
-    *   Set the ID as `vault-approle-id` (referenced in the `Jenkinsfile`).
-3.  **Configure System:** In "Configure System" -> "Vault", set the URL to `http://<your-vault-ip>:8200`.
+### Phase 5 — Running the Password Pipeline
+
+1. Create a Pipeline job pointing to `jenkins/Jenkinsfile`
+2. Click **Build with Parameters**
+3. Fill in:
+   - `ACTION` → `STORE` or `RETRIEVE`
+   - `SECRET_PATH` → e.g. `app-passwords/production/database`
+   - `SECRET_KEY` → e.g. `root_pass`
+   - `SECRET_VALUE` → *(only for STORE)*
+4. Trigger the build
+
+> **Security note:** `SECRET_VALUE` is a `password` parameter type in Jenkins — it is masked in the build configuration UI and wrapped in `MaskPasswordsBuildWrapper` so it never appears in console output.
 
 ---
 
-### **Phase 5: The Pipeline (Execution)**
-1.  **Write Jenkinsfile:** Use the provided [Jenkinsfile](jenkins/Jenkinsfile).
-2.  **Run Job:** Trigger the Jenkins job. It will:
-    *   Authenticate via AppRole.
-    *   Pull Azure secrets from `internal/azure-creds`.
-    *   Inject them into the environment.
-    *   Run `terraform plan` successfully.
+### Phase 6 — CLI Usage (NTZ-LINUX-003 Terminal)
+
+Make the script executable once:
+
+```bash
+chmod +x scripts/vault-vault.sh
+```
+
+**Store a secret:**
+```bash
+./scripts/vault-vault.sh store production/database root_pass "UltraSecure2026!"
+./scripts/vault-vault.sh store staging/redis     cache_key "r3d1s$ecret"
+./scripts/vault-vault.sh store team/github       deploy_token "ghp_abc123"
+```
+
+**Retrieve a secret:**
+```bash
+./scripts/vault-vault.sh get production/database root_pass
+./scripts/vault-vault.sh get staging/redis       cache_key
+```
 
 ---
 
-### **Phase 6: Validation (Audit & Cleanup)**
-1.  **Verify Masking:** Check Jenkins logs; secrets should be `****`.
-2.  **Workspace Cleanup:** The `post { always { deleteDir() } }` block ensures no secrets remain on the agent disk.
+### Phase 7 — Validation & Audit
 
-### **The "Definition of Done" for Project 4**
-* [x] Vault is running as a systemd service.
-* [x] Azure secrets are NOT stored in the Jenkins UI.
-* [x] Jenkins authenticates using AppRole.
-* [x] Terraform successfully deploys an Azure resource using variables injected by Vault.
+```bash
+# 1. Load the access policy
+vault policy write jenkins-policy vault/policies/password-saver-policy.hcl
+
+# 2. Write a test credential
+vault kv put internal/app-passwords/production/database root_pass="UltraSecureProduction2026!"
+
+# 3. Read it back and confirm parity
+vault kv get -field=root_pass internal/app-passwords/production/database
+
+# 4. List all secrets at a path
+vault kv list internal/app-passwords/production/
+
+# 5. Check version history for a secret
+vault kv metadata get internal/app-passwords/production/database
+```
 
 ---
-# Azure-Secret-Management-via-Jenkins
+
+## ✅ Definition of Done
+
+- [x] Vault is running as a hardened `systemd` service
+- [x] Secrets are **never** stored in Jenkins UI, disk files, or build logs
+- [x] Jenkins authenticates using short-lived AppRole tokens
+- [x] Pipeline dynamically **stores** or **retrieves** any credential via parameters
+- [x] Secret values are **masked** in all Jenkins console output
+- [x] Workspace is wiped and env vars unset after every build
+- [x] CLI utility enables terminal-native secret management
+- [x] KV-V2 provides **full version history** for every stored secret
+
+---
+
+## 🔒 Security Posture
+
+| Control | Implementation |
+| :--- | :--- |
+| **Encryption at rest** | Vault AES-256-GCM (default) |
+| **Encryption in transit** | Vault API over localhost (production: TLS) |
+| **Least privilege** | HCL policy scoped strictly to `app-passwords/*` |
+| **Secret masking** | `MaskPasswordsBuildWrapper` + `password` param type |
+| **Token expiry** | 20-min TTL, 10-use limit per AppRole token |
+| **Zero footprint** | `cleanWs` + `unset` on every pipeline completion |
+| **Audit logging** | Vault logs every read/write with identity + timestamp |
+
+---
+
+## 💡 Senior Engineer Notes
+
+- **Secret rotation** is a one-time Vault update — `vault kv put` with the new value. Every pipeline and CLI consumer gets the new secret on next read, with no `Jenkinsfile` changes required.
+- **KV-V2 versioning** means you can roll back to a previous version of any secret with `vault kv rollback`.
+- **Namespace isolation:** Add team-scoped paths (`app-passwords/team-a/*`, `app-passwords/team-b/*`) and create separate policies per team for multi-tenant credential management.

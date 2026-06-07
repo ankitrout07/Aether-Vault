@@ -1,36 +1,82 @@
 pipeline {
     agent { label 'terraform-runner' }
 
+    options {
+        timeout(time: 10, unit: 'MINUTES')
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['RETRIEVE', 'STORE'],
+            description: 'Select whether to read or save a secret.'
+        )
+        string(
+            name: 'SECRET_PATH',
+            defaultValue: 'app-passwords/production/database',
+            description: 'The storage path location inside the Vault KV engine (e.g. app-passwords/team/service).'
+        )
+        string(
+            name: 'SECRET_KEY',
+            defaultValue: 'db_password',
+            description: 'The key/identifier name for the password field.'
+        )
+        password(
+            name: 'SECRET_VALUE',
+            defaultValue: '',
+            description: 'The actual secret value. Only required when ACTION is STORE.'
+        )
+    }
+
     stages {
-        stage('Vault Secret Retrieval') {
+        stage('Vault Operation Execution') {
             steps {
-                withVault(configuration: [
-                              vaultUrl: 'http://127.0.0.1:8200',
-                              vaultCredentialId: 'vault-approle-id' 
-                          ],
-                          vaultSecrets: [[
-                              path: 'internal/azure-creds', 
-                              engineVersion: 2, 
-                              secretValues: [
-                                  [envVar: 'ARM_CLIENT_ID', vaultKey: 'client_id'],
-                                  [envVar: 'ARM_CLIENT_SECRET', vaultKey: 'client_secret'],
-                                  [envVar: 'ARM_SUBSCRIPTION_ID', vaultKey: 'subscription_id'],
-                                  [envVar: 'ARM_TENANT_ID', vaultKey: 'tenant_id']
-                              ]
-                          ]]) {
-                    sh 'echo "Vault Secrets successfully injected."'
+                withVault(
+                    configuration: [
+                        vaultUrl: 'http://127.0.0.1:8200',
+                        vaultCredentialId: 'vault-approle-id'
+                    ],
+                    vaultSecrets: [[
+                        path: "internal/${params.SECRET_PATH}",
+                        engineVersion: 2,
+                        secretValues: [[
+                            envVar: 'CURRENT_SECRET',
+                            vaultKey: "${params.SECRET_KEY}"
+                        ]]
+                    ]]
+                ) {
+                    script {
+                        if (params.ACTION == 'STORE') {
+                            // Mask the password input in all log output
+                            wrap([$class: 'MaskPasswordsBuildWrapper',
+                                  varPasswordPairs: [[password: params.SECRET_VALUE, var: 'SECRET_VALUE']]]) {
+                                sh '''
+                                    echo "Writing encrypted key-value pair to Vault storage path..."
+                                    vault kv put "internal/${SECRET_PATH}" "${SECRET_KEY}=${SECRET_VALUE}"
+                                    echo "Operation successful. Secret written to Vault KV engine."
+                                '''
+                            }
+                        } else {
+                            // Retrieve — confirm data exists without leaking plaintext to logs
+                            sh '''
+                                echo "Secret retrieved for key [${SECRET_KEY}] at path [${SECRET_PATH}]:"
+                                echo "${CURRENT_SECRET}" | sed 's/./*/g'
+                                echo "Retrieval complete. Pipe CURRENT_SECRET into your downstream step above."
+                            '''
+                        }
+                    }
                 }
             }
         }
+    }
 
-        stage('Terraform Plan') {
-            steps {
-                // Pointing to the absolute path on NTZ-LINUX-003
-                dir('/home/ankit/git/Azure Secret Management Via Jenkins/terraform') { 
-                    sh 'terraform init'
-                    sh 'terraform plan'
-                }
-            }
+    post {
+        always {
+            // Wipe workspace and unset any in-memory secret env vars
+            cleanWs deleteDirs: true, notFailBuild: true
+            sh 'unset CURRENT_SECRET SECRET_VALUE 2>/dev/null || true'
         }
     }
 }
