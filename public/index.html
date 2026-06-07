@@ -4,34 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuantumVault // Offline Secure Suite</title>
-    <meta name="description" content="Secure offline-first enterprise password manager and credential vault.">
+    <meta name="description" content="Production-grade offline enterprise password manager with TOTP, hygiene auditing, and session hardening.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body {
-            background: linear-gradient(135deg, #090d16 0%, #111126 100%);
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        /* Strength meter bar animation */
+        body { background: linear-gradient(135deg, #090d16 0%, #111126 100%); font-family: system-ui, -apple-system, sans-serif; }
+        .glass-panel { background: rgba(255,255,255,0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); }
         .strength-bar { transition: width 0.4s ease, background-color 0.4s ease; }
-
-        /* Subtle fade-in for panels */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         .fade-in { animation: fadeIn 0.25s ease forwards; }
-
-        /* PIN digit glow on active */
-        .pin-digit:focus { box-shadow: 0 0 0 2px #6366f1; }
+        @keyframes toastIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+        .toast-in { animation: toastIn 0.3s ease forwards; }
+        .ring-track { fill:none; stroke:rgba(255,255,255,0.06); }
+        .ring-progress { fill:none; stroke-linecap:round; transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset 1s linear, stroke 0.5s ease; }
     </style>
 </head>
 <body class="min-h-screen text-slate-200 flex items-center justify-center p-4">
 
-    <!-- ═══════════════════════ LOCK GATE ═══════════════════════ -->
+    <!-- Toast container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none"></div>
+
+    <!-- Session expired banner -->
+    <div id="sessionBanner" class="hidden fixed top-0 left-0 right-0 bg-amber-600/90 backdrop-blur-sm text-white text-center py-2 text-xs font-mono z-[90] tracking-widest">
+        SESSION EXPIRED — VAULT LOCKED DUE TO INACTIVITY
+    </div>
+
+    <!-- ══════════════════ LOCK GATE ══════════════════ -->
     <div id="lockScreen" class="w-full max-w-sm glass-panel rounded-2xl p-10 text-center shadow-2xl fade-in">
         <div class="inline-flex p-4 rounded-full bg-indigo-500/10 text-indigo-400 mb-5 animate-pulse">
             <i data-lucide="shield-alert" class="w-12 h-12"></i>
@@ -39,26 +37,15 @@
         <h2 class="text-2xl font-bold text-white mb-1 tracking-widest uppercase">QuantumVault</h2>
         <p class="text-slate-500 text-xs mb-7 tracking-wide">OFFLINE · ISOLATED · ZERO-TRUST</p>
 
-        <!-- 4-digit PIN bubbles -->
-        <div class="flex justify-center gap-3 mb-6" id="pinDisplay">
+        <div class="flex justify-center gap-3 mb-6">
             <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-0"></div>
             <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-1"></div>
             <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-2"></div>
             <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-3"></div>
         </div>
 
-        <!-- Hidden native input for keyboard -->
-        <input
-            type="password"
-            maxlength="4"
-            id="pinCode"
-            class="sr-only"
-            autofocus
-            inputmode="numeric"
-            oninput="onPINInput(this.value)"
-        >
+        <input type="password" maxlength="4" id="pinCode" class="sr-only" autofocus inputmode="numeric" oninput="onPINInput(this.value)">
 
-        <!-- Numeric keypad -->
         <div class="grid grid-cols-3 gap-3 mb-6 text-white font-semibold text-lg select-none">
             <button onclick="appendPIN('1')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">1</button>
             <button onclick="appendPIN('2')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">2</button>
@@ -73,12 +60,11 @@
             <button onclick="appendPIN('0')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">0</button>
             <button onclick="verifyPIN()" class="py-3 rounded-xl bg-indigo-600/60 hover:bg-indigo-500 text-indigo-200 transition-all active:scale-95 text-sm">↵</button>
         </div>
-
         <p id="pinError" class="text-rose-400 text-xs font-mono hidden">ACCESS DENIED — INVALID PIN</p>
         <p class="text-slate-600 text-xs mt-4 font-mono">SYSTEM ISOLATED · 127.0.0.1</p>
     </div>
 
-    <!-- ═══════════════════════ VAULT DASHBOARD ═══════════════════════ -->
+    <!-- ══════════════════ VAULT DASHBOARD ══════════════════ -->
     <div id="vaultDashboard" class="hidden w-full max-w-6xl glass-panel rounded-2xl flex flex-col md:flex-row shadow-2xl min-h-[680px] overflow-hidden fade-in">
 
         <!-- Sidebar -->
@@ -88,36 +74,38 @@
                     <i data-lucide="shield-check" class="text-indigo-400 w-5 h-5"></i>
                     <div>
                         <span class="font-bold text-white text-xs tracking-widest">QUANTUMVAULT</span>
-                        <span class="block text-indigo-500 text-[10px] font-mono">v1.2.0 · OFFLINE</span>
+                        <span class="block text-indigo-500 text-[10px] font-mono">v1.3.0 · OFFLINE</span>
                     </div>
                 </div>
                 <nav class="space-y-1.5">
-                    <button onclick="switchTab('passwords')" id="tab-passwords"
-                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                    <button onclick="switchTab('passwords')" id="tab-passwords" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="key" class="w-4 h-4 shrink-0"></i> Credentials
                     </button>
-                    <button onclick="switchTab('notes')" id="tab-notes"
-                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                    <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="sticky-note" class="w-4 h-4 shrink-0"></i> Secure Notes
                     </button>
-                    <button onclick="switchTab('generator')" id="tab-generator"
-                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                    <button onclick="switchTab('generator')" id="tab-generator" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="zap" class="w-4 h-4 shrink-0"></i> Generator
                     </button>
-                    <button onclick="switchTab('changelog')" id="tab-changelog"
-                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                    <button onclick="switchTab('totp')" id="tab-totp" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="clock" class="w-4 h-4 shrink-0"></i> Authenticator
+                    </button>
+                    <button onclick="switchTab('audit')" id="tab-audit" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i> Vault Audit
+                    </button>
+                    <button onclick="switchTab('changelog')" id="tab-changelog" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="terminal" class="w-4 h-4 shrink-0"></i> System Ledger
                     </button>
                 </nav>
             </div>
             <div class="pt-4 border-t border-slate-800 text-[10px] font-mono text-slate-600 space-y-1">
                 <div class="flex justify-between"><span>STATUS</span><span class="text-emerald-500">ONLINE</span></div>
-                <div class="flex justify-between"><span>VAULT</span><span class="text-emerald-500">SEALED:NO</span></div>
+                <div class="flex justify-between"><span>SESSION</span><span id="sessionCountdown" class="text-amber-400">5:00</span></div>
                 <div class="flex justify-between"><span>ENCRYPT</span><span class="text-indigo-400">AES-256</span></div>
             </div>
         </div>
 
-        <!-- Main Content Area -->
+        <!-- Main content area -->
         <div class="flex-1 p-8 overflow-y-auto">
 
             <!-- ── Credentials Tab ── -->
@@ -125,14 +113,12 @@
                 <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-800 pb-4">
                     <div>
                         <h2 class="text-xl font-bold text-white">Credentials Directory</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">AES-256 encrypted at rest · Zero-log retrieval</p>
+                        <p class="text-xs text-slate-500 mt-0.5">AES-256 encrypted · 30-sec clipboard auto-wipe on copy</p>
                     </div>
                     <button onclick="openPasswordModal()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20">
                         <i data-lucide="plus" class="w-4 h-4"></i> Add Credential
                     </button>
                 </div>
-
-                <!-- Inline strength indicator for visible passwords -->
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -161,7 +147,7 @@
                         <button onclick="setNoteFilter('active')" id="filter-active" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-700 text-white transition-all">Active</button>
                         <button onclick="setNoteFilter('archive')" id="filter-archive" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-800/60 transition-all">Archive</button>
                         <button onclick="setNoteFilter('bin')" id="filter-bin" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-800/60 transition-all">Recycle Bin</button>
-                        <button onclick="openNoteModal()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+                        <button onclick="openNoteModal()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-xs font-semibold text-white ml-2 flex items-center gap-2">
                             <i data-lucide="plus" class="w-4 h-4"></i> New Note
                         </button>
                     </div>
@@ -174,53 +160,94 @@
             <div id="view-generator" class="tab-view hidden fade-in space-y-6">
                 <div class="border-b border-slate-800 pb-4">
                     <h2 class="text-xl font-bold text-white">Password Generator</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Cryptographically random password synthesis engine</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Cryptographically random via Web Crypto API (crypto.getRandomValues)</p>
                 </div>
                 <div class="max-w-lg space-y-5">
                     <div class="flex gap-3">
-                        <input id="generatedPassword" type="text" readonly
-                            class="flex-1 bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-indigo-300 focus:outline-none tracking-wider select-all"
-                            placeholder="Click Generate to synthesize...">
-                        <button onclick="copyGenerated()" class="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 transition-all text-xs font-semibold">Copy</button>
+                        <input id="generatedPassword" type="text" readonly class="flex-1 bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-indigo-300 focus:outline-none tracking-wider select-all" placeholder="Click Generate...">
+                        <button onclick="copyGenerated()" class="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 text-xs font-semibold transition-all">Copy</button>
                     </div>
-
-                    <!-- Strength meter -->
                     <div>
                         <div class="flex justify-between text-xs font-mono text-slate-500 mb-1.5">
-                            <span>STRENGTH METRIC</span>
-                            <span id="strengthLabel">—</span>
+                            <span>STRENGTH METRIC</span><span id="strengthLabel">—</span>
                         </div>
                         <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div id="strengthBar" class="strength-bar h-full rounded-full w-0 bg-slate-600"></div>
                         </div>
                     </div>
-
-                    <!-- Options -->
                     <div class="grid grid-cols-2 gap-4 text-sm text-slate-300">
                         <div>
                             <label class="block text-xs text-slate-500 font-mono mb-1.5">LENGTH: <span id="lengthVal">20</span></label>
-                            <input type="range" id="pwdLength" min="8" max="64" value="20"
-                                oninput="document.getElementById('lengthVal').textContent=this.value"
-                                class="w-full accent-indigo-500 cursor-pointer">
+                            <input type="range" id="pwdLength" min="8" max="64" value="20" oninput="document.getElementById('lengthVal').textContent=this.value" class="w-full accent-indigo-500 cursor-pointer">
                         </div>
                         <div class="space-y-2 pt-1">
-                            <label class="flex items-center gap-2 text-xs cursor-pointer">
-                                <input type="checkbox" id="useUpper" checked class="accent-indigo-500"> Uppercase (A–Z)
-                            </label>
-                            <label class="flex items-center gap-2 text-xs cursor-pointer">
-                                <input type="checkbox" id="useNumbers" checked class="accent-indigo-500"> Numbers (0–9)
-                            </label>
-                            <label class="flex items-center gap-2 text-xs cursor-pointer">
-                                <input type="checkbox" id="useSymbols" checked class="accent-indigo-500"> Symbols (!@#$)
-                            </label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="useUpper" checked class="accent-indigo-500"> Uppercase (A–Z)</label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="useNumbers" checked class="accent-indigo-500"> Numbers (0–9)</label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="useSymbols" checked class="accent-indigo-500"> Symbols (!@#$)</label>
                         </div>
                     </div>
-
-                    <button onclick="generatePassword()"
-                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+                    <button onclick="generatePassword()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
                         <i data-lucide="zap" class="w-4 h-4"></i> Generate Secure Password
                     </button>
                 </div>
+            </div>
+
+            <!-- ── TOTP Authenticator Tab ── -->
+            <div id="view-totp" class="tab-view hidden fade-in space-y-6">
+                <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">2FA Authenticator</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">RFC 6238 TOTP · HMAC-SHA1 · Seeds encrypted in Vault · 30-sec rotation</p>
+                    </div>
+                    <button onclick="openTOTPModal()" class="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-xl text-xs font-semibold text-white flex items-center gap-2 shadow-lg shadow-violet-600/20">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Add Account
+                    </button>
+                </div>
+                <div id="totpGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <p id="noTOTP" class="text-slate-600 text-sm text-center py-12 font-mono hidden">No 2FA accounts yet — add a TOTP seed to get started.</p>
+            </div>
+
+            <!-- ── Vault Audit Tab ── -->
+            <div id="view-audit" class="tab-view hidden fade-in space-y-6">
+                <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Vault Security Audit</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Password hygiene analysis — weak, duplicate, and short credential detection</p>
+                    </div>
+                    <button onclick="runAudit()" class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-xl text-xs font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Refresh Audit
+                    </button>
+                </div>
+                <!-- Score ring + summary cards -->
+                <div class="flex flex-wrap gap-8 items-center">
+                    <div class="relative w-32 h-32 shrink-0">
+                        <svg width="128" height="128" viewBox="0 0 128 128">
+                            <circle cx="64" cy="64" r="54" class="ring-track" stroke-width="10"/>
+                            <circle id="auditRing" cx="64" cy="64" r="54" class="ring-progress" stroke="#6366f1" stroke-width="10"
+                                stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="auditScore" class="text-3xl font-bold text-white">—</span>
+                            <span class="text-[10px] text-slate-500 font-mono">SCORE</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                            <div id="auditWeak" class="text-2xl font-bold text-rose-400">0</div>
+                            <div class="text-xs text-slate-500 font-mono mt-1">WEAK</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                            <div id="auditDup" class="text-2xl font-bold text-amber-400">0</div>
+                            <div class="text-xs text-slate-500 font-mono mt-1">DUPLICATES</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                            <div id="auditShort" class="text-2xl font-bold text-orange-400">0</div>
+                            <div class="text-xs text-slate-500 font-mono mt-1">TOO SHORT</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="auditList" class="space-y-2"></div>
+                <p id="auditClean" class="hidden text-emerald-400 text-sm font-mono text-center py-6">✓ All credentials pass hygiene checks. Vault is clean.</p>
             </div>
 
             <!-- ── System Ledger Tab ── -->
@@ -232,31 +259,36 @@
                 <div class="space-y-4 font-mono text-xs">
                     <div class="p-5 bg-slate-950/40 border border-indigo-500/20 rounded-xl space-y-3">
                         <div class="flex flex-wrap justify-between text-indigo-400 font-semibold text-sm gap-2">
-                            <span>🚀 v1.2.0 — Core Engine Transformation</span>
+                            <span>🔐 v1.3.0 — Production Hardening Suite</span>
                             <span class="text-slate-500">2026-06-07</span>
                         </div>
-                        <p class="text-slate-400">Refactored target infrastructure from Azure CI/CD orchestration to native standalone offline application.</p>
-                        <ul class="list-disc list-inside text-slate-500 space-y-1.5 pl-1">
-                            <li>Implemented 4-digit numeric Security PIN lock gate with keypad UI.</li>
-                            <li>Added Password Strength Metric bar with real-time scoring.</li>
-                            <li>Added Secure Notes with Active / Archive / Recycle Bin state filters.</li>
-                            <li>Integrated cryptographic Password Generator engine (length, charset options).</li>
-                            <li>Windows packaging via <code class="text-indigo-400">pkg</code>: spawns bundled vault.exe daemon internally.</li>
+                        <ul class="list-disc list-inside text-slate-400 space-y-1.5 pl-1">
+                            <li>RFC 6238 TOTP Authenticator: pure JS HMAC-SHA1 via crypto.subtle, base32 decode, 30s countdown SVG ring with colour transitions.</li>
+                            <li>Password Hygiene Auditor: weak / duplicate / short detection, security score ring (0–100), per-credential violation badges.</li>
+                            <li>Clipboard Auto-Wipe: 30-second countdown toast, automatic purge via navigator.clipboard.writeText('').</li>
+                            <li>Session Inactivity Lock: 5-minute idle timeout wipes in-memory state and relocks vault with expiry banner.</li>
                         </ul>
                     </div>
-                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-3">
+                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-2">
+                        <div class="flex flex-wrap justify-between text-slate-400 font-semibold text-sm gap-2">
+                            <span>🚀 v1.2.0 — Offline Desktop Suite</span>
+                            <span class="text-slate-500">2026-06-07</span>
+                        </div>
+                        <p class="text-slate-500">PIN lock gate, secure notes with state filters, password generator, Windows pkg packaging (PE32+ exe).</p>
+                    </div>
+                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-2">
                         <div class="flex flex-wrap justify-between text-slate-400 font-semibold text-sm gap-2">
                             <span>⚙️ v1.1.0 — Web Application Layer</span>
                             <span class="text-slate-500">2026-06-07</span>
                         </div>
-                        <p class="text-slate-500">Added Express API backend and Glassmorphism Tailwind UI dashboard, Docker Compose orchestration.</p>
+                        <p class="text-slate-500">Express API backend, Tailwind Glassmorphism UI, Docker Compose orchestration.</p>
                     </div>
-                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-3">
+                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-2">
                         <div class="flex flex-wrap justify-between text-slate-400 font-semibold text-sm gap-2">
-                            <span>🔐 v1.0.0 — Pipeline Refactor</span>
+                            <span>🔑 v1.0.0 — Pipeline Refactor</span>
                             <span class="text-slate-500">2026-06-07</span>
                         </div>
-                        <p class="text-slate-500">Pivoted from Azure infrastructure provisioning to Enterprise Password Saver via Jenkins + Vault AppRole.</p>
+                        <p class="text-slate-500">Pivoted from Azure infra provisioning to Enterprise Password Saver via Jenkins + Vault AppRole.</p>
                     </div>
                 </div>
             </div>
@@ -267,25 +299,20 @@
     <!-- ═══ PASSWORD MODAL ═══ -->
     <div id="passwordModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="key" class="w-5 h-5 text-indigo-400"></i> Store New Credential
-            </h3>
-            <input id="pwdLabel" type="text" placeholder="Application Label (e.g., GitHub Enterprise)"
-                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-            <input id="pwdUser" type="text" placeholder="Username / Email"
-                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="key" class="w-5 h-5 text-indigo-400"></i> Store New Credential</h3>
+            <input id="pwdLabel" type="text" placeholder="Application Label (e.g., GitHub Enterprise)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            <input id="pwdUser" type="text" placeholder="Username / Email" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
             <div class="relative">
-                <input id="pwdVal" type="text" placeholder="Secure Password String" oninput="updateModalStrength(this.value)"
+                <input id="pwdVal" type="text" placeholder="Password" oninput="updateModalStrength(this.value)"
                     class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors pr-20">
                 <button onclick="fillGeneratedInModal()" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-700 hover:bg-indigo-600 text-white px-2 py-1 rounded-lg font-mono transition-all">GEN</button>
             </div>
-            <!-- Inline strength bar for modal -->
             <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div id="modalStrengthBar" class="strength-bar h-full rounded-full w-0 bg-slate-600"></div>
             </div>
             <div class="flex justify-end gap-2 text-xs font-semibold pt-1">
                 <button onclick="closePasswordModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">Cancel</button>
-                <button onclick="savePasswordRecord()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-600/20">Commit to Vault</button>
+                <button onclick="savePasswordRecord()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all">Commit to Vault</button>
             </div>
         </div>
     </div>
@@ -293,357 +320,612 @@
     <!-- ═══ NOTE MODAL ═══ -->
     <div id="noteModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
-            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="sticky-note" class="w-5 h-5 text-emerald-400"></i> Write Secure Note
-            </h3>
-            <input id="noteTitle" type="text" placeholder="Note Title"
-                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
-            <textarea id="noteContent" rows="5" placeholder="Sensitive contents, tokens, or keys..."
-                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors resize-none font-mono"></textarea>
+            <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="sticky-note" class="w-5 h-5 text-emerald-400"></i> Write Secure Note</h3>
+            <input id="noteTitle" type="text" placeholder="Note Title" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
+            <textarea id="noteContent" rows="5" placeholder="Sensitive contents, tokens, or keys..." class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors resize-none font-mono"></textarea>
             <div class="flex justify-end gap-2 text-xs font-semibold pt-1">
                 <button onclick="closeNoteModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">Cancel</button>
-                <button onclick="saveNoteRecord()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-lg shadow-emerald-600/20">Save Note</button>
+                <button onclick="saveNoteRecord()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TOTP MODAL ═══ -->
+    <div id="totpModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-violet-400"></i> Add 2FA Account</h3>
+            <input id="totpLabel" type="text" placeholder="Account Label (e.g., GitHub · ankitrout07)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition-colors">
+            <input id="totpSecret" type="text" placeholder="Base32 Secret (e.g., JBSWY3DPEHPK3PXP)" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z2-7]/g,'')"
+                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-violet-300 focus:outline-none focus:border-violet-500 transition-colors uppercase">
+            <p class="text-[11px] text-slate-500 font-mono">Find the secret in your app's "Setup key" or "Manual entry" option when enabling 2FA.</p>
+            <div class="flex justify-end gap-2 text-xs font-semibold pt-1">
+                <button onclick="closeTOTPModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">Cancel</button>
+                <button onclick="saveTOTPAccount()" class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-all">Add Account</button>
             </div>
         </div>
     </div>
 
     <script>
-        // ── Constants ─────────────────────────────────────────────────────────
-        const MASTER_PIN = '2026';
-        let pinBuffer = '';
-        let passwordsState = [];
-        let notesState = [];
-        let currentNoteFilter = 'active';
-        let lastGenerated = '';
+    // ═══════════════════════════════════════════════════════════
+    //  QUANTUMVAULT v1.3 — FULL PRODUCTION HARDENING SUITE
+    //  Module 1: Password Hygiene Auditor
+    //  Module 2: Clipboard Auto-Wipe (30s) + Inactivity Lock (5min)
+    //  Module 3: RFC 6238 TOTP Authenticator (HMAC-SHA1, crypto.subtle)
+    // ═══════════════════════════════════════════════════════════
 
-        // ── PIN Gate Logic ────────────────────────────────────────────────────
-        function appendPIN(digit) {
-            if (pinBuffer.length >= 4) return;
-            pinBuffer += digit;
-            updatePINDots();
-            document.getElementById('pinCode').value = pinBuffer;
-            if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
+    // ── Constants ──────────────────────────────────────────────
+    const MASTER_PIN        = '2026';
+    const INACTIVITY_MS     = 5 * 60 * 1000;   // 5 minutes
+    const CLIPBOARD_WIPE_MS = 30 * 1000;        // 30 seconds
+    const AUDIT_CIRC        = 2 * Math.PI * 54; // audit ring r=54
+    const TOTP_CIRC         = 2 * Math.PI * 20; // totp ring  r=20
+
+    // ── State ──────────────────────────────────────────────────
+    let pinBuffer         = '';
+    let passwordsState    = [];
+    let notesState        = [];
+    let totpState         = [];
+    let currentNoteFilter = 'active';
+    let inactivityTimer   = null;
+    let sessionInterval   = null;
+    let sessionRemaining  = INACTIVITY_MS;
+    let clipboardTick     = null;
+    let totpTickInterval  = null;
+
+    // ═══════════════════════════════════════════════════════════
+    //  MODULE 2A — SESSION INACTIVITY LOCK
+    // ═══════════════════════════════════════════════════════════
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        clearInterval(sessionInterval);
+        sessionRemaining = INACTIVITY_MS;
+        updateSessionCountdown();
+
+        sessionInterval = setInterval(() => {
+            sessionRemaining = Math.max(0, sessionRemaining - 1000);
+            updateSessionCountdown();
+        }, 1000);
+
+        inactivityTimer = setTimeout(() => lockVault(true), INACTIVITY_MS);
+    }
+
+    function updateSessionCountdown() {
+        const el = document.getElementById('sessionCountdown');
+        if (!el) return;
+        const m = Math.floor(sessionRemaining / 60000);
+        const s = Math.floor((sessionRemaining % 60000) / 1000);
+        el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+        el.className   = sessionRemaining < 60000 ? 'text-rose-400' : 'text-amber-400';
+    }
+
+    function lockVault(expired = false) {
+        // Wipe all sensitive in-memory state
+        passwordsState = []; notesState = []; totpState = [];
+        pinBuffer = '';
+        clearTimeout(inactivityTimer);
+        clearInterval(sessionInterval);
+        clearInterval(totpTickInterval);
+
+        document.getElementById('vaultDashboard').classList.add('hidden');
+        document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('pinCode').value = '';
+        updatePINDots();
+
+        if (expired) {
+            const banner = document.getElementById('sessionBanner');
+            banner.classList.remove('hidden');
+            setTimeout(() => banner.classList.add('hidden'), 5000);
         }
+        lucide.createIcons();
+    }
 
-        function clearPIN() {
+    // Attach activity listeners — reset timer on any interaction
+    ['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
+        document.addEventListener(evt, () => {
+            if (!document.getElementById('vaultDashboard').classList.contains('hidden'))
+                resetInactivityTimer();
+        }, { passive: true })
+    );
+
+    // ═══════════════════════════════════════════════════════════
+    //  MODULE 2B — CLIPBOARD AUTO-WIPE (30 seconds)
+    // ═══════════════════════════════════════════════════════════
+    function copyWithAutoPurge(text, label = 'Password') {
+        navigator.clipboard.writeText(text).then(() => {
+            clearInterval(clipboardTick);
+
+            let remaining = 30;
+            const toastId = `clip-${Date.now()}`;
+            showCountdownToast(toastId, remaining);
+
+            clipboardTick = setInterval(() => {
+                remaining--;
+                updateCountdownToast(toastId, remaining);
+                if (remaining <= 0) {
+                    clearInterval(clipboardTick);
+                    navigator.clipboard.writeText('').catch(() => {});
+                    removeToast(toastId);
+                    showToast('Clipboard wiped ✓', 'emerald');
+                }
+            }, 1000);
+        }).catch(() => showToast('Clipboard access denied — copy manually', 'rose'));
+    }
+
+    // ── Toast helpers ─────────────────────────────────────────
+    function showToast(msg, color = 'indigo') {
+        const map = { indigo:'bg-indigo-600', emerald:'bg-emerald-600', amber:'bg-amber-600', rose:'bg-rose-600', violet:'bg-violet-600' };
+        const tc  = document.getElementById('toastContainer');
+        const id  = `toast-${Date.now()}`;
+        const el  = document.createElement('div');
+        el.id = id;
+        el.className = `pointer-events-auto toast-in ${map[color]||map.indigo} text-white text-xs font-mono px-4 py-2.5 rounded-xl shadow-xl max-w-xs`;
+        el.textContent = msg;
+        tc.appendChild(el);
+        setTimeout(() => removeToast(id), 3500);
+    }
+    function showCountdownToast(id, remaining) {
+        const tc = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        el.id = id;
+        el.className = 'pointer-events-auto toast-in bg-slate-800 border border-amber-500/30 text-amber-300 text-xs font-mono px-4 py-2.5 rounded-xl shadow-xl max-w-xs flex items-center gap-2';
+        el.innerHTML = `<span>⏱</span><span>Clipboard wipes in <span id="${id}-val">${remaining}</span>s</span>`;
+        tc.appendChild(el);
+    }
+    function updateCountdownToast(id, remaining) {
+        const el = document.getElementById(`${id}-val`);
+        if (el) el.textContent = remaining;
+    }
+    function removeToast(id) { document.getElementById(id)?.remove(); }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PIN GATE
+    // ═══════════════════════════════════════════════════════════
+    function appendPIN(d) {
+        if (pinBuffer.length >= 4) return;
+        pinBuffer += d;
+        updatePINDots();
+        document.getElementById('pinCode').value = pinBuffer;
+        if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
+    }
+    function clearPIN() {
+        pinBuffer = '';
+        document.getElementById('pinCode').value = '';
+        updatePINDots();
+        document.getElementById('pinError').classList.add('hidden');
+    }
+    function onPINInput(val) {
+        pinBuffer = val; updatePINDots();
+        if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
+    }
+    function updatePINDots() {
+        for (let i = 0; i < 4; i++) {
+            const d = document.getElementById(`dot-${i}`);
+            if (i < pinBuffer.length) { d.classList.add('bg-indigo-400','border-indigo-400'); d.classList.remove('bg-transparent','border-slate-700'); }
+            else { d.classList.remove('bg-indigo-400','border-indigo-400'); d.classList.add('bg-transparent','border-slate-700'); }
+        }
+    }
+    function verifyPIN() {
+        if (pinBuffer === MASTER_PIN) {
+            document.getElementById('lockScreen').classList.add('hidden');
+            document.getElementById('vaultDashboard').classList.remove('hidden');
+            lucide.createIcons();
+            switchTab('passwords');
+            loadAllVaultData();
+            resetInactivityTimer();
+            startTOTPTick();
+        } else {
+            document.getElementById('pinError').classList.remove('hidden');
             pinBuffer = '';
             document.getElementById('pinCode').value = '';
             updatePINDots();
-            document.getElementById('pinError').classList.add('hidden');
+            setTimeout(() => document.getElementById('pinError').classList.add('hidden'), 2000);
         }
-
-        function onPINInput(val) {
-            pinBuffer = val;
-            updatePINDots();
-            if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
+    }
+    document.addEventListener('keydown', e => {
+        if (!document.getElementById('lockScreen').classList.contains('hidden')) {
+            if (e.key >= '0' && e.key <= '9') appendPIN(e.key);
+            if (e.key === 'Backspace') { pinBuffer = pinBuffer.slice(0,-1); updatePINDots(); }
+            if (e.key === 'Enter') verifyPIN();
         }
+    });
 
-        function updatePINDots() {
-            for (let i = 0; i < 4; i++) {
-                const dot = document.getElementById(`dot-${i}`);
-                if (i < pinBuffer.length) {
-                    dot.classList.add('bg-indigo-400', 'border-indigo-400');
-                    dot.classList.remove('bg-transparent', 'border-slate-700');
-                } else {
-                    dot.classList.remove('bg-indigo-400', 'border-indigo-400');
-                    dot.classList.add('bg-transparent', 'border-slate-700');
+    // ═══════════════════════════════════════════════════════════
+    //  TAB NAVIGATION
+    // ═══════════════════════════════════════════════════════════
+    function switchTab(id) {
+        document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('bg-indigo-600/10','text-indigo-400','border','border-indigo-500/20'));
+        document.getElementById(`view-${id}`).classList.remove('hidden');
+        document.getElementById(`tab-${id}`).classList.add('bg-indigo-600/10','text-indigo-400','border','border-indigo-500/20');
+        if (id === 'audit') runAudit();
+        if (id === 'totp')  renderTOTP();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  VAULT API SYNC
+    // ═══════════════════════════════════════════════════════════
+    async function loadAllVaultData() {
+        try {
+            const [p,n,t] = await Promise.all([
+                fetch('/api/vault/load/passwords').then(r=>r.json()),
+                fetch('/api/vault/load/notes').then(r=>r.json()),
+                fetch('/api/vault/load/totp').then(r=>r.json())
+            ]);
+            try { passwordsState = JSON.parse(JSON.parse(p.data)); } catch { passwordsState=[]; }
+            try { notesState     = JSON.parse(JSON.parse(n.data)); } catch { notesState=[]; }
+            try { totpState      = JSON.parse(JSON.parse(t.data)); } catch { totpState=[]; }
+            renderPasswords(); renderNotes(); renderTOTP();
+        } catch(e) { console.error('Vault load error:',e); }
+    }
+    async function syncWithVault(type, payload) {
+        await fetch('/api/vault/save', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ type, data: JSON.stringify(payload) })
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PASSWORD STRENGTH SCORER
+    // ═══════════════════════════════════════════════════════════
+    function scorePassword(pwd) {
+        if (!pwd) return { score:0, label:'—', color:'bg-slate-600', pct:'0%' };
+        let s = 0;
+        if (pwd.length >= 8)  s++;
+        if (pwd.length >= 14) s++;
+        if (pwd.length >= 20) s++;
+        if (/[A-Z]/.test(pwd)) s++;
+        if (/[0-9]/.test(pwd)) s++;
+        if (/[^A-Za-z0-9]/.test(pwd)) s++;
+        const lvl = [
+            {label:'Very Weak', color:'bg-rose-600',    pct:'10%'},
+            {label:'Weak',      color:'bg-orange-500',  pct:'25%'},
+            {label:'Fair',      color:'bg-yellow-500',  pct:'45%'},
+            {label:'Good',      color:'bg-lime-500',    pct:'65%'},
+            {label:'Strong',    color:'bg-green-500',   pct:'82%'},
+            {label:'Very Strong',color:'bg-emerald-400',pct:'100%'}
+        ];
+        return { score:s, ...lvl[Math.min(s, lvl.length-1)] };
+    }
+    function updateModalStrength(val) {
+        const { pct, color } = scorePassword(val);
+        const bar = document.getElementById('modalStrengthBar');
+        bar.style.width = pct; bar.className = `strength-bar h-full rounded-full ${color}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  CREDENTIALS CRUD
+    // ═══════════════════════════════════════════════════════════
+    function openPasswordModal()  { document.getElementById('passwordModal').classList.remove('hidden'); }
+    function closePasswordModal() {
+        document.getElementById('passwordModal').classList.add('hidden');
+        ['pwdLabel','pwdUser','pwdVal'].forEach(i => document.getElementById(i).value='');
+        document.getElementById('modalStrengthBar').style.width='0';
+    }
+    function fillGeneratedInModal() {
+        const pwd = quickGenerate();
+        document.getElementById('pwdVal').value = pwd;
+        updateModalStrength(pwd);
+    }
+    async function savePasswordRecord() {
+        const label = document.getElementById('pwdLabel').value.trim();
+        const user  = document.getElementById('pwdUser').value.trim();
+        const val   = document.getElementById('pwdVal').value;
+        if (!label||!val) return alert('Label and Password are required.');
+        const { label:strengthLabel } = scorePassword(val);
+        passwordsState.push({ id:Date.now(), label, user, val, strength:strengthLabel });
+        await syncWithVault('passwords', passwordsState);
+        closePasswordModal();
+        renderPasswords();
+        showToast('Credential committed to Vault ✓','indigo');
+    }
+    async function deletePassword(id) {
+        if (!confirm('Permanently purge this credential?')) return;
+        passwordsState = passwordsState.filter(p=>p.id!==id);
+        await syncWithVault('passwords', passwordsState);
+        renderPasswords();
+        showToast('Credential purged','rose');
+    }
+    function renderPasswords() {
+        const body=document.getElementById('passwordTableBody'), empty=document.getElementById('noPasswords');
+        body.innerHTML='';
+        if (!passwordsState.length) { empty.classList.remove('hidden'); return; }
+        empty.classList.add('hidden');
+        passwordsState.forEach(p => {
+            const { pct, color } = scorePassword(p.val);
+            const tr = document.createElement('tr');
+            tr.className = 'group border-b border-slate-800/40 hover:bg-slate-900/30 transition-colors';
+            tr.innerHTML = `
+                <td class="py-3.5 pr-4 font-semibold text-white text-sm">${escHtml(p.label)}</td>
+                <td class="py-3.5 pr-4 text-slate-400 text-sm">${escHtml(p.user||'N/A')}</td>
+                <td class="py-3.5 pr-4 font-mono text-xs text-indigo-300">••••••••••</td>
+                <td class="py-3.5 pr-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div class="strength-bar h-full rounded-full ${color}" style="width:${pct}"></div>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500">${p.strength||'—'}</span>
+                    </div>
+                </td>
+                <td class="py-3.5 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <button data-label="${escAttr(p.label)}" data-val="${escAttr(p.val)}" onclick="copyWithAutoPurge(this.dataset.val, this.dataset.label)"
+                            class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-900/20 transition-colors">Copy</button>
+                        <button onclick="deletePassword(${p.id})"
+                            class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded-lg hover:bg-rose-900/20 transition-colors">Purge</button>
+                    </div>
+                </td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  NOTES CRUD
+    // ═══════════════════════════════════════════════════════════
+    function openNoteModal()  { document.getElementById('noteModal').classList.remove('hidden'); }
+    function closeNoteModal() {
+        document.getElementById('noteModal').classList.add('hidden');
+        document.getElementById('noteTitle').value=''; document.getElementById('noteContent').value='';
+    }
+    function setNoteFilter(f) {
+        currentNoteFilter=f;
+        document.querySelectorAll('.note-filter-btn').forEach(b=>{ b.classList.remove('bg-slate-700','text-white'); b.classList.add('text-slate-400'); });
+        document.getElementById(`filter-${f}`).classList.add('bg-slate-700','text-white');
+        document.getElementById(`filter-${f}`).classList.remove('text-slate-400');
+        renderNotes();
+    }
+    async function saveNoteRecord() {
+        const title=document.getElementById('noteTitle').value.trim(), content=document.getElementById('noteContent').value.trim();
+        if (!title||!content) return alert('Title and content required.');
+        notesState.push({ id:Date.now(), title, content, status:'active', created:new Date().toLocaleDateString() });
+        await syncWithVault('notes', notesState);
+        closeNoteModal(); renderNotes();
+        showToast('Note saved to Vault ✓','emerald');
+    }
+    async function updateNoteStatus(id,s) {
+        notesState=notesState.map(n=>n.id===id?{...n,status:s}:n);
+        await syncWithVault('notes',notesState); renderNotes();
+    }
+    async function purgeNotePermanently(id) {
+        if (!confirm('Permanently delete this note?')) return;
+        notesState=notesState.filter(n=>n.id!==id);
+        await syncWithVault('notes',notesState); renderNotes();
+    }
+    function renderNotes() {
+        const grid=document.getElementById('notesGrid'), empty=document.getElementById('noNotes');
+        grid.innerHTML='';
+        const filtered=notesState.filter(n=>n.status===currentNoteFilter);
+        if (!filtered.length){ empty.classList.remove('hidden'); return; }
+        empty.classList.add('hidden');
+        filtered.forEach(n=>{
+            const card=document.createElement('div');
+            card.className='p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between min-h-[150px] hover:border-slate-700/60 transition-colors';
+            let actions='';
+            if(n.status==='active') actions=`<button onclick="updateNoteStatus(${n.id},'archive')" class="text-xs text-amber-400 hover:underline font-semibold">Archive</button><button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
+            else if(n.status==='archive') actions=`<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button><button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
+            else actions=`<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button><button onclick="purgeNotePermanently(${n.id})" class="text-xs text-rose-500 font-bold hover:underline">Purge Forever</button>`;
+            card.innerHTML=`<div><div class="flex justify-between items-start mb-2"><h4 class="font-bold text-slate-100 text-sm">${escHtml(n.title)}</h4><span class="text-[10px] text-slate-600 font-mono ml-2 shrink-0">${n.created||''}</span></div><p class="text-xs text-slate-400 font-mono whitespace-pre-wrap line-clamp-4">${escHtml(n.content)}</p></div><div class="flex justify-end gap-3 pt-3 border-t border-slate-800/40 mt-3">${actions}</div>`;
+            grid.appendChild(card);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PASSWORD GENERATOR
+    // ═══════════════════════════════════════════════════════════
+    const CHARS={ lower:'abcdefghijklmnopqrstuvwxyz', upper:'ABCDEFGHIJKLMNOPQRSTUVWXYZ', numbers:'0123456789', symbols:'!@#$%^&*()-_=+[]{}|;:,.<>?' };
+    function quickGenerate() {
+        const pool=CHARS.lower+CHARS.upper+CHARS.numbers+CHARS.symbols;
+        return Array.from(crypto.getRandomValues(new Uint32Array(20))).map(v=>pool[v%pool.length]).join('');
+    }
+    function generatePassword() {
+        const len=parseInt(document.getElementById('pwdLength').value);
+        let pool=CHARS.lower;
+        if(document.getElementById('useUpper').checked)   pool+=CHARS.upper;
+        if(document.getElementById('useNumbers').checked) pool+=CHARS.numbers;
+        if(document.getElementById('useSymbols').checked) pool+=CHARS.symbols;
+        const pwd=Array.from(crypto.getRandomValues(new Uint32Array(len))).map(v=>pool[v%pool.length]).join('');
+        document.getElementById('generatedPassword').value=pwd;
+        const {label,pct,color}=scorePassword(pwd);
+        document.getElementById('strengthLabel').textContent=label;
+        const bar=document.getElementById('strengthBar');
+        bar.style.width=pct; bar.className=`strength-bar h-full rounded-full ${color}`;
+    }
+    function copyGenerated() {
+        const val=document.getElementById('generatedPassword').value;
+        if(!val) return;
+        copyWithAutoPurge(val,'Generated password');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  MODULE 3 — RFC 6238 TOTP AUTHENTICATOR
+    // ═══════════════════════════════════════════════════════════
+
+    // RFC 4648 Base32 decode
+    function base32Decode(b32) {
+        const alpha='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let bits=0, val=0;
+        const out=[];
+        for(const c of b32.toUpperCase().replace(/=+$/,'')) {
+            const idx=alpha.indexOf(c);
+            if(idx===-1) continue;
+            val=(val<<5)|idx; bits+=5;
+            if(bits>=8){ bits-=8; out.push((val>>bits)&0xff); }
+        }
+        return new Uint8Array(out);
+    }
+
+    // RFC 6238 TOTP: HOTP(secret, floor(unixtime/30))
+    async function computeTOTP(secret) {
+        const keyBytes=base32Decode(secret);
+        const counter=Math.floor(Date.now()/1000/30);
+        // 8-byte big-endian counter buffer
+        const buf=new ArrayBuffer(8);
+        const dv=new DataView(buf);
+        dv.setUint32(0, Math.floor(counter/0x100000000), false);
+        dv.setUint32(4, counter>>>0, false);
+        const key=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-1'},false,['sign']);
+        const sig=await crypto.subtle.sign('HMAC',key,buf);
+        const hash=new Uint8Array(sig);
+        // Dynamic truncation (RFC 4226 §5.4)
+        const offset=hash[hash.length-1]&0x0f;
+        const code=(((hash[offset]&0x7f)<<24)|((hash[offset+1]&0xff)<<16)|((hash[offset+2]&0xff)<<8)|(hash[offset+3]&0xff));
+        return String(code%1_000_000).padStart(6,'0');
+    }
+
+    function openTOTPModal()  { document.getElementById('totpModal').classList.remove('hidden'); }
+    function closeTOTPModal() {
+        document.getElementById('totpModal').classList.add('hidden');
+        document.getElementById('totpLabel').value=''; document.getElementById('totpSecret').value='';
+    }
+    async function saveTOTPAccount() {
+        const label=document.getElementById('totpLabel').value.trim();
+        const secret=document.getElementById('totpSecret').value.trim().toUpperCase();
+        if(!label||!secret) return alert('Label and secret required.');
+        try { if(base32Decode(secret).length<10) throw new Error(); } catch { return alert('Invalid base32 secret (must be ≥ 10 bytes decoded).'); }
+        totpState.push({ id:Date.now(), label, secret });
+        await syncWithVault('totp',totpState);
+        closeTOTPModal(); renderTOTP();
+        showToast('2FA account saved ✓','violet');
+    }
+    async function deleteTOTPAccount(id) {
+        if(!confirm('Remove this 2FA account?')) return;
+        totpState=totpState.filter(t=>t.id!==id);
+        await syncWithVault('totp',totpState); renderTOTP();
+    }
+
+    function renderTOTP() {
+        const grid=document.getElementById('totpGrid'), empty=document.getElementById('noTOTP');
+        grid.innerHTML='';
+        if(!totpState.length){ empty.classList.remove('hidden'); return; }
+        empty.classList.add('hidden');
+        totpState.forEach(t=>{
+            const ringC=TOTP_CIRC.toFixed(2);
+            const card=document.createElement('div');
+            card.id=`totp-card-${t.id}`;
+            card.className='p-5 rounded-xl bg-slate-900/40 border border-slate-800/80 hover:border-violet-500/30 transition-colors';
+            card.innerHTML=`
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-semibold text-slate-200">${escHtml(t.label)}</span>
+                    <button onclick="deleteTOTPAccount(${t.id})" class="text-[10px] text-rose-400 hover:underline font-mono">Remove</button>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="relative w-12 h-12 shrink-0">
+                        <svg width="48" height="48" viewBox="0 0 48 48">
+                            <circle cx="24" cy="24" r="20" class="ring-track" stroke-width="4"/>
+                            <circle id="ring-${t.id}" cx="24" cy="24" r="20" class="ring-progress" stroke="#8b5cf6" stroke-width="4"
+                                stroke-dasharray="${ringC}" stroke-dashoffset="0"/>
+                        </svg>
+                        <span id="sec-${t.id}" class="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-violet-400">30</span>
+                    </div>
+                    <div class="flex-1">
+                        <div id="code-${t.id}" class="text-3xl font-mono font-bold text-violet-300 tracking-[0.15em]">··· ···</div>
+                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">TOTP · RFC 6238 · HMAC-SHA1</div>
+                    </div>
+                    <button id="copy-totp-${t.id}" onclick="copyTOTP(${t.id})"
+                        class="text-xs text-violet-400 hover:text-violet-300 font-semibold px-3 py-1.5 rounded-lg hover:bg-violet-900/20 border border-violet-500/20 transition-colors shrink-0">Copy</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        updateTOTPCodes();
+    }
+
+    async function updateTOTPCodes() {
+        const nowSec     = Date.now()/1000;
+        const secInPeriod = nowSec%30;
+        const remaining  = Math.ceil(30-secInPeriod);
+        const progress   = secInPeriod/30;
+
+        for(const t of totpState) {
+            try {
+                const code   = await computeTOTP(t.secret);
+                const codeEl = document.getElementById(`code-${t.id}`);
+                const ringEl = document.getElementById(`ring-${t.id}`);
+                const secEl  = document.getElementById(`sec-${t.id}`);
+                if(codeEl) codeEl.textContent=code.slice(0,3)+' '+code.slice(3);
+                if(ringEl) {
+                    ringEl.style.strokeDashoffset=(TOTP_CIRC*progress).toFixed(2);
+                    ringEl.style.stroke=remaining>10?'#8b5cf6':remaining>5?'#f59e0b':'#ef4444';
                 }
-            }
+                if(secEl) secEl.textContent=remaining;
+            } catch(e){ console.error('TOTP compute error:',t.label,e); }
         }
+    }
 
-        function verifyPIN() {
-            if (pinBuffer === MASTER_PIN) {
-                document.getElementById('lockScreen').classList.add('hidden');
-                document.getElementById('vaultDashboard').classList.remove('hidden');
-                lucide.createIcons();
-                switchTab('passwords');
-                loadAllVaultData();
-            } else {
-                document.getElementById('pinError').classList.remove('hidden');
-                pinBuffer = '';
-                document.getElementById('pinCode').value = '';
-                updatePINDots();
-                // Shake the error indicator
-                setTimeout(() => document.getElementById('pinError').classList.add('hidden'), 2000);
-            }
-        }
+    // Store current codes for copy (avoids template literal injection issues)
+    function copyTOTP(id) {
+        const el=document.getElementById(`code-${id}`);
+        if(el) copyWithAutoPurge(el.textContent.replace(' ',''), 'TOTP code');
+    }
 
-        // Keyboard support on lock screen
-        document.addEventListener('keydown', (e) => {
-            if (!document.getElementById('lockScreen').classList.contains('hidden')) {
-                if (e.key >= '0' && e.key <= '9') appendPIN(e.key);
-                if (e.key === 'Backspace') { pinBuffer = pinBuffer.slice(0, -1); updatePINDots(); }
-                if (e.key === 'Enter') verifyPIN();
-            }
+    function startTOTPTick() {
+        clearInterval(totpTickInterval);
+        totpTickInterval=setInterval(updateTOTPCodes,1000);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  MODULE 1 — PASSWORD HYGIENE AUDITOR
+    // ═══════════════════════════════════════════════════════════
+    function runAudit() {
+        let weakCount=0, dupCount=0, shortCount=0;
+        const violations=[];
+
+        // Build duplicate value map
+        const valMap={};
+        passwordsState.forEach(p=>{ if(!valMap[p.val]) valMap[p.val]=[]; valMap[p.val].push(p.label); });
+
+        passwordsState.forEach(p=>{
+            const issues=[];
+            const {score}=scorePassword(p.val);
+            if(score<3){ issues.push({type:'WEAK',badge:'bg-rose-900/30 text-rose-300 border-rose-500/20'}); weakCount++; }
+            if(p.val.length<10){ issues.push({type:'TOO SHORT',badge:'bg-orange-900/30 text-orange-300 border-orange-500/20'}); shortCount++; }
+            if(valMap[p.val].length>1){ issues.push({type:'DUPLICATE',badge:'bg-amber-900/30 text-amber-300 border-amber-500/20'}); dupCount++; }
+            if(issues.length) violations.push({...p,issues});
         });
 
-        // ── Tab Navigation ────────────────────────────────────────────────────
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border', 'border-indigo-500/20');
-            });
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
-            const btn = document.getElementById(`tab-${tabId}`);
-            btn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border', 'border-indigo-500/20');
-        }
+        const total=passwordsState.length;
+        const flaggedIds=new Set(violations.map(v=>v.id));
+        const score=total===0?100:Math.round(((total-flaggedIds.size)/total)*100);
 
-        // ── Vault API Sync ────────────────────────────────────────────────────
-        async function loadAllVaultData() {
-            try {
-                const [pRes, nRes] = await Promise.all([
-                    fetch('/api/vault/load/passwords'),
-                    fetch('/api/vault/load/notes')
-                ]);
-                const pData = await pRes.json();
-                const nData = await nRes.json();
-                try { passwordsState = JSON.parse(JSON.parse(pData.data)); } catch { passwordsState = []; }
-                try { notesState = JSON.parse(JSON.parse(nData.data)); } catch { notesState = []; }
-                renderPasswords();
-                renderNotes();
-            } catch (e) {
-                console.error('Vault load error:', e);
-            }
-        }
+        // Update ring
+        const offset=AUDIT_CIRC*(1-score/100);
+        const ring=document.getElementById('auditRing');
+        ring.style.strokeDashoffset=offset.toFixed(2);
+        ring.style.stroke=score>=80?'#22c55e':score>=50?'#f59e0b':'#ef4444';
 
-        async function syncWithVault(type, payload) {
-            await fetch('/api/vault/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, data: JSON.stringify(payload) })
-            });
-        }
+        document.getElementById('auditScore').textContent=score;
+        document.getElementById('auditScore').className=`text-3xl font-bold ${score>=80?'text-emerald-400':score>=50?'text-amber-400':'text-rose-400'}`;
+        document.getElementById('auditWeak').textContent=weakCount;
+        document.getElementById('auditDup').textContent=dupCount;
+        document.getElementById('auditShort').textContent=shortCount;
 
-        // ── Password Strength Scoring ─────────────────────────────────────────
-        function scorePassword(pwd) {
-            if (!pwd) return { score: 0, label: '—', color: 'bg-slate-600' };
-            let score = 0;
-            if (pwd.length >= 8)  score++;
-            if (pwd.length >= 14) score++;
-            if (pwd.length >= 20) score++;
-            if (/[A-Z]/.test(pwd)) score++;
-            if (/[0-9]/.test(pwd)) score++;
-            if (/[^A-Za-z0-9]/.test(pwd)) score++;
+        const list=document.getElementById('auditList'), clean=document.getElementById('auditClean');
+        list.innerHTML='';
+        if(!violations.length){ clean.classList.remove('hidden'); return; }
+        clean.classList.add('hidden');
+        violations.forEach(v=>{
+            const row=document.createElement('div');
+            row.className='flex items-center justify-between p-4 bg-slate-900/40 border border-slate-800/80 rounded-xl gap-4 hover:border-slate-700/60 transition-colors';
+            const badges=v.issues.map(i=>`<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${i.badge}">${i.type}</span>`).join('');
+            row.innerHTML=`
+                <div>
+                    <div class="font-semibold text-slate-200 text-sm">${escHtml(v.label)}</div>
+                    <div class="text-xs text-slate-500 font-mono mt-0.5">${escHtml(v.user||'')}</div>
+                </div>
+                <div class="flex gap-2 flex-wrap justify-end">${badges}</div>
+            `;
+            list.appendChild(row);
+        });
+    }
 
-            const levels = [
-                { label: 'Very Weak',  color: 'bg-rose-600',   pct: '10%' },
-                { label: 'Weak',       color: 'bg-orange-500', pct: '25%' },
-                { label: 'Fair',       color: 'bg-yellow-500', pct: '45%' },
-                { label: 'Good',       color: 'bg-lime-500',   pct: '65%' },
-                { label: 'Strong',     color: 'bg-green-500',  pct: '82%' },
-                { label: 'Very Strong',color: 'bg-emerald-400','pct': '100%' },
-            ];
-            const idx = Math.min(score, levels.length - 1);
-            return { ...levels[idx], score };
-        }
+    // ═══════════════════════════════════════════════════════════
+    //  UTILITY
+    // ═══════════════════════════════════════════════════════════
+    function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escAttr(str){ return String(str).replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/\\/g,'\\\\'); }
 
-        function updateModalStrength(val) {
-            const { pct, color } = scorePassword(val);
-            const bar = document.getElementById('modalStrengthBar');
-            bar.style.width = pct;
-            bar.className = `strength-bar h-full rounded-full ${color}`;
-        }
-
-        // ── Password CRUD ─────────────────────────────────────────────────────
-        function openPasswordModal() { document.getElementById('passwordModal').classList.remove('hidden'); }
-        function closePasswordModal() {
-            document.getElementById('passwordModal').classList.add('hidden');
-            ['pwdLabel','pwdUser','pwdVal'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('modalStrengthBar').style.width = '0';
-        }
-
-        function fillGeneratedInModal() {
-            const pwd = quickGenerate();
-            document.getElementById('pwdVal').value = pwd;
-            updateModalStrength(pwd);
-        }
-
-        async function savePasswordRecord() {
-            const label = document.getElementById('pwdLabel').value.trim();
-            const user  = document.getElementById('pwdUser').value.trim();
-            const val   = document.getElementById('pwdVal').value;
-            if (!label || !val) return alert('Label and Password are required.');
-
-            const { label: strengthLabel } = scorePassword(val);
-            passwordsState.push({ id: Date.now(), label, user, val, strength: strengthLabel });
-            await syncWithVault('passwords', passwordsState);
-            closePasswordModal();
-            renderPasswords();
-        }
-
-        async function deletePassword(id) {
-            if (!confirm('Permanently purge this credential?')) return;
-            passwordsState = passwordsState.filter(p => p.id !== id);
-            await syncWithVault('passwords', passwordsState);
-            renderPasswords();
-        }
-
-        function renderPasswords() {
-            const body = document.getElementById('passwordTableBody');
-            const empty = document.getElementById('noPasswords');
-            body.innerHTML = '';
-            if (passwordsState.length === 0) { empty.classList.remove('hidden'); return; }
-            empty.classList.add('hidden');
-
-            passwordsState.forEach(p => {
-                const { pct, color } = scorePassword(p.val);
-                const tr = document.createElement('tr');
-                tr.className = 'group border-b border-slate-800/40 hover:bg-slate-900/30 transition-colors';
-                tr.innerHTML = `
-                    <td class="py-3.5 pr-4 font-semibold text-white text-sm">${escHtml(p.label)}</td>
-                    <td class="py-3.5 pr-4 text-slate-400 text-sm">${escHtml(p.user || 'N/A')}</td>
-                    <td class="py-3.5 pr-4 font-mono text-xs text-indigo-300 max-w-[160px] truncate select-all" title="${escHtml(p.val)}">${escHtml(p.val)}</td>
-                    <td class="py-3.5 pr-4">
-                        <div class="flex items-center gap-2">
-                            <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="strength-bar h-full rounded-full ${color}" style="width:${pct}"></div>
-                            </div>
-                            <span class="text-[10px] font-mono text-slate-500">${p.strength || '—'}</span>
-                        </div>
-                    </td>
-                    <td class="py-3.5 text-right">
-                        <button onclick="deletePassword(${p.id})" class="text-xs text-rose-400 hover:text-rose-300 font-semibold transition-colors px-2 py-1 rounded-lg hover:bg-rose-900/20">Purge</button>
-                    </td>
-                `;
-                body.appendChild(tr);
-            });
-        }
-
-        // ── Notes CRUD ────────────────────────────────────────────────────────
-        function openNoteModal()  { document.getElementById('noteModal').classList.remove('hidden'); }
-        function closeNoteModal() {
-            document.getElementById('noteModal').classList.add('hidden');
-            document.getElementById('noteTitle').value = '';
-            document.getElementById('noteContent').value = '';
-        }
-
-        function setNoteFilter(filter) {
-            currentNoteFilter = filter;
-            document.querySelectorAll('.note-filter-btn').forEach(b => {
-                b.classList.remove('bg-slate-700', 'text-white');
-                b.classList.add('text-slate-400');
-            });
-            document.getElementById(`filter-${filter}`).classList.add('bg-slate-700', 'text-white');
-            document.getElementById(`filter-${filter}`).classList.remove('text-slate-400');
-            renderNotes();
-        }
-
-        async function saveNoteRecord() {
-            const title   = document.getElementById('noteTitle').value.trim();
-            const content = document.getElementById('noteContent').value.trim();
-            if (!title || !content) return alert('Title and content are required.');
-            notesState.push({ id: Date.now(), title, content, status: 'active', created: new Date().toLocaleDateString() });
-            await syncWithVault('notes', notesState);
-            closeNoteModal();
-            renderNotes();
-        }
-
-        async function updateNoteStatus(id, newStatus) {
-            notesState = notesState.map(n => n.id === id ? { ...n, status: newStatus } : n);
-            await syncWithVault('notes', notesState);
-            renderNotes();
-        }
-
-        async function purgeNotePermanently(id) {
-            if (!confirm('Permanently delete this note? This cannot be undone.')) return;
-            notesState = notesState.filter(n => n.id !== id);
-            await syncWithVault('notes', notesState);
-            renderNotes();
-        }
-
-        function renderNotes() {
-            const grid  = document.getElementById('notesGrid');
-            const empty = document.getElementById('noNotes');
-            grid.innerHTML = '';
-            const filtered = notesState.filter(n => n.status === currentNoteFilter);
-            if (filtered.length === 0) { empty.classList.remove('hidden'); return; }
-            empty.classList.add('hidden');
-
-            filtered.forEach(n => {
-                const card = document.createElement('div');
-                card.className = 'p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between min-h-[150px] hover:border-slate-700/60 transition-colors';
-
-                let actions = '';
-                if (n.status === 'active') {
-                    actions = `<button onclick="updateNoteStatus(${n.id},'archive')" class="text-xs text-amber-400 hover:underline font-semibold">Archive</button>
-                               <button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
-                } else if (n.status === 'archive') {
-                    actions = `<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button>
-                               <button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
-                } else if (n.status === 'bin') {
-                    actions = `<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button>
-                               <button onclick="purgeNotePermanently(${n.id})" class="text-xs text-rose-500 font-bold hover:underline">Purge Forever</button>`;
-                }
-
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-2">
-                            <h4 class="font-bold text-slate-100 text-sm leading-tight">${escHtml(n.title)}</h4>
-                            <span class="text-[10px] text-slate-600 font-mono shrink-0 ml-2">${n.created || ''}</span>
-                        </div>
-                        <p class="text-xs text-slate-400 font-mono whitespace-pre-wrap line-clamp-4">${escHtml(n.content)}</p>
-                    </div>
-                    <div class="flex justify-end gap-3 pt-3 border-t border-slate-800/40 mt-3">${actions}</div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        // ── Password Generator ────────────────────────────────────────────────
-        const CHARS = {
-            lower:   'abcdefghijklmnopqrstuvwxyz',
-            upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-            numbers: '0123456789',
-            symbols: '!@#$%^&*()-_=+[]{}|;:,.<>?'
-        };
-
-        function quickGenerate() {
-            const len  = 20;
-            const pool = CHARS.lower + CHARS.upper + CHARS.numbers + CHARS.symbols;
-            return Array.from(crypto.getRandomValues(new Uint32Array(len)))
-                .map(v => pool[v % pool.length]).join('');
-        }
-
-        function generatePassword() {
-            const len     = parseInt(document.getElementById('pwdLength').value);
-            const useUp   = document.getElementById('useUpper').checked;
-            const useNum  = document.getElementById('useNumbers').checked;
-            const useSym  = document.getElementById('useSymbols').checked;
-
-            let pool = CHARS.lower;
-            if (useUp)  pool += CHARS.upper;
-            if (useNum) pool += CHARS.numbers;
-            if (useSym) pool += CHARS.symbols;
-
-            const pwd = Array.from(crypto.getRandomValues(new Uint32Array(len)))
-                .map(v => pool[v % pool.length]).join('');
-
-            lastGenerated = pwd;
-            document.getElementById('generatedPassword').value = pwd;
-
-            const { label, pct, color } = scorePassword(pwd);
-            document.getElementById('strengthLabel').textContent = label;
-            const bar = document.getElementById('strengthBar');
-            bar.style.width = pct;
-            bar.className = `strength-bar h-full rounded-full ${color}`;
-        }
-
-        function copyGenerated() {
-            const val = document.getElementById('generatedPassword').value;
-            if (!val) return;
-            navigator.clipboard.writeText(val).then(() => {
-                const btn = document.querySelector('#view-generator button:nth-of-type(1)');
-            });
-            alert('Copied to clipboard!');
-        }
-
-        // ── Utility ───────────────────────────────────────────────────────────
-        function escHtml(str) {
-            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-        }
-
-        // Init Lucide icons on load
-        lucide.createIcons();
+    // Initialise
+    lucide.createIcons();
     </script>
 </body>
 </html>
