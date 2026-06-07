@@ -1,0 +1,14 @@
+{
+  "name": "azure-vault-password-saver",
+  "version": "1.0.0",
+  "description": "Secure Password Saver using HashiCorp Vault KV-V2 Engine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
