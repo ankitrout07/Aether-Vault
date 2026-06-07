@@ -3,90 +3,647 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Password Vault</title>
+    <title>QuantumVault // Offline Secure Suite</title>
+    <meta name="description" content="Secure offline-first enterprise password manager and credential vault.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            background: linear-gradient(135deg, #090d16 0%, #111126 100%);
+            font-family: system-ui, -apple-system, sans-serif;
         }
         .glass-panel {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
+        /* Strength meter bar animation */
+        .strength-bar { transition: width 0.4s ease, background-color 0.4s ease; }
+
+        /* Subtle fade-in for panels */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s ease forwards; }
+
+        /* PIN digit glow on active */
+        .pin-digit:focus { box-shadow: 0 0 0 2px #6366f1; }
     </style>
 </head>
-<body class="min-h-screen text-slate-100 flex items-center justify-center p-6">
-    <div class="w-full max-w-4xl glass-panel rounded-2xl p-8 shadow-2xl">
-        <div class="flex items-center gap-3 mb-8 border-b border-slate-700/50 pb-4">
-            <i data-lucide="shield-check" class="text-indigo-400 w-8 h-8"></i>
-            <h1 class="text-2xl font-bold tracking-wide text-white">Password Saver Dashboard</h1>
+<body class="min-h-screen text-slate-200 flex items-center justify-center p-4">
+
+    <!-- ═══════════════════════ LOCK GATE ═══════════════════════ -->
+    <div id="lockScreen" class="w-full max-w-sm glass-panel rounded-2xl p-10 text-center shadow-2xl fade-in">
+        <div class="inline-flex p-4 rounded-full bg-indigo-500/10 text-indigo-400 mb-5 animate-pulse">
+            <i data-lucide="shield-alert" class="w-12 h-12"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-white mb-1 tracking-widest uppercase">QuantumVault</h2>
+        <p class="text-slate-500 text-xs mb-7 tracking-wide">OFFLINE · ISOLATED · ZERO-TRUST</p>
+
+        <!-- 4-digit PIN bubbles -->
+        <div class="flex justify-center gap-3 mb-6" id="pinDisplay">
+            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-0"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-1"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-2"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-3"></div>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-8">
-            <div class="space-y-4">
-                <h2 class="text-lg font-semibold text-indigo-300 flex items-center gap-2">
-                    <i data-lucide="lock" class="w-4 h-4"></i> Encrypt & Store
-                </h2>
-                <input id="storePath" type="text" placeholder="Application Path (e.g., prod/db)" class="w-full bg-slate-900/60 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-                <input id="storeKey" type="text" placeholder="Key Identifier (e.g., root_pass)" class="w-full bg-slate-900/60 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-                <input id="storeValue" type="password" placeholder="Password Value" class="w-full bg-slate-900/60 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-                <button onclick="storeSecret()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium p-3 rounded-lg transition-colors shadow-lg shadow-indigo-600/20">Commit to Vault</button>
+        <!-- Hidden native input for keyboard -->
+        <input
+            type="password"
+            maxlength="4"
+            id="pinCode"
+            class="sr-only"
+            autofocus
+            inputmode="numeric"
+            oninput="onPINInput(this.value)"
+        >
+
+        <!-- Numeric keypad -->
+        <div class="grid grid-cols-3 gap-3 mb-6 text-white font-semibold text-lg select-none">
+            <button onclick="appendPIN('1')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">1</button>
+            <button onclick="appendPIN('2')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">2</button>
+            <button onclick="appendPIN('3')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">3</button>
+            <button onclick="appendPIN('4')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">4</button>
+            <button onclick="appendPIN('5')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">5</button>
+            <button onclick="appendPIN('6')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">6</button>
+            <button onclick="appendPIN('7')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">7</button>
+            <button onclick="appendPIN('8')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">8</button>
+            <button onclick="appendPIN('9')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">9</button>
+            <button onclick="clearPIN()" class="py-3 rounded-xl bg-rose-900/30 hover:bg-rose-800/40 text-rose-400 transition-all text-sm active:scale-95">CLR</button>
+            <button onclick="appendPIN('0')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">0</button>
+            <button onclick="verifyPIN()" class="py-3 rounded-xl bg-indigo-600/60 hover:bg-indigo-500 text-indigo-200 transition-all active:scale-95 text-sm">↵</button>
+        </div>
+
+        <p id="pinError" class="text-rose-400 text-xs font-mono hidden">ACCESS DENIED — INVALID PIN</p>
+        <p class="text-slate-600 text-xs mt-4 font-mono">SYSTEM ISOLATED · 127.0.0.1</p>
+    </div>
+
+    <!-- ═══════════════════════ VAULT DASHBOARD ═══════════════════════ -->
+    <div id="vaultDashboard" class="hidden w-full max-w-6xl glass-panel rounded-2xl flex flex-col md:flex-row shadow-2xl min-h-[680px] overflow-hidden fade-in">
+
+        <!-- Sidebar -->
+        <div class="w-full md:w-60 bg-slate-950/50 border-r border-slate-800/60 p-6 flex flex-col justify-between shrink-0">
+            <div>
+                <div class="flex items-center gap-2.5 mb-8 pb-4 border-b border-slate-800">
+                    <i data-lucide="shield-check" class="text-indigo-400 w-5 h-5"></i>
+                    <div>
+                        <span class="font-bold text-white text-xs tracking-widest">QUANTUMVAULT</span>
+                        <span class="block text-indigo-500 text-[10px] font-mono">v1.2.0 · OFFLINE</span>
+                    </div>
+                </div>
+                <nav class="space-y-1.5">
+                    <button onclick="switchTab('passwords')" id="tab-passwords"
+                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="key" class="w-4 h-4 shrink-0"></i> Credentials
+                    </button>
+                    <button onclick="switchTab('notes')" id="tab-notes"
+                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="sticky-note" class="w-4 h-4 shrink-0"></i> Secure Notes
+                    </button>
+                    <button onclick="switchTab('generator')" id="tab-generator"
+                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="zap" class="w-4 h-4 shrink-0"></i> Generator
+                    </button>
+                    <button onclick="switchTab('changelog')" id="tab-changelog"
+                        class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="terminal" class="w-4 h-4 shrink-0"></i> System Ledger
+                    </button>
+                </nav>
+            </div>
+            <div class="pt-4 border-t border-slate-800 text-[10px] font-mono text-slate-600 space-y-1">
+                <div class="flex justify-between"><span>STATUS</span><span class="text-emerald-500">ONLINE</span></div>
+                <div class="flex justify-between"><span>VAULT</span><span class="text-emerald-500">SEALED:NO</span></div>
+                <div class="flex justify-between"><span>ENCRYPT</span><span class="text-indigo-400">AES-256</span></div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 p-8 overflow-y-auto">
+
+            <!-- ── Credentials Tab ── -->
+            <div id="view-passwords" class="tab-view hidden fade-in space-y-6">
+                <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Credentials Directory</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">AES-256 encrypted at rest · Zero-log retrieval</p>
+                    </div>
+                    <button onclick="openPasswordModal()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Add Credential
+                    </button>
+                </div>
+
+                <!-- Inline strength indicator for visible passwords -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-slate-500 text-[11px] uppercase font-mono tracking-wider">
+                                <th class="pb-3 pr-4">Label</th>
+                                <th class="pb-3 pr-4">Username</th>
+                                <th class="pb-3 pr-4">Password</th>
+                                <th class="pb-3 pr-4">Strength</th>
+                                <th class="pb-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="passwordTableBody" class="text-sm divide-y divide-slate-800/40"></tbody>
+                    </table>
+                    <p id="noPasswords" class="text-slate-600 text-sm text-center py-12 font-mono hidden">No credentials stored yet.</p>
+                </div>
             </div>
 
-            <div class="space-y-4 border-t md:border-t-0 md:border-l border-slate-700/50 pt-6 md:pt-0 md:pl-8">
-                <h2 class="text-lg font-semibold text-emerald-300 flex items-center gap-2">
-                    <i data-lucide="unlock" class="w-4 h-4"></i> Decrypt & Retrieve
-                </h2>
-                <input id="getPath" type="text" placeholder="Application Path" class="w-full bg-slate-900/60 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
-                <input id="getKey" type="text" placeholder="Key Identifier" class="w-full bg-slate-900/60 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
-                <button onclick="getSecret()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium p-3 rounded-lg transition-colors shadow-lg shadow-emerald-600/20">Fetch Password</button>
-                
-                <div id="resultPanel" class="hidden p-4 rounded-lg bg-slate-900/80 border border-emerald-500/30 text-emerald-400 font-mono break-all mt-4">
-                    <span class="text-slate-400 text-xs block mb-1">DECRYPTED OUTPUT:</span>
-                    <span id="secretOutput"></span>
+            <!-- ── Secure Notes Tab ── -->
+            <div id="view-notes" class="tab-view hidden fade-in space-y-6">
+                <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Secure Notebook</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Encrypted workspace for tokens, keys, and sensitive intel</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <button onclick="setNoteFilter('active')" id="filter-active" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-700 text-white transition-all">Active</button>
+                        <button onclick="setNoteFilter('archive')" id="filter-archive" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-800/60 transition-all">Archive</button>
+                        <button onclick="setNoteFilter('bin')" id="filter-bin" class="note-filter-btn px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-800/60 transition-all">Recycle Bin</button>
+                        <button onclick="openNoteModal()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+                            <i data-lucide="plus" class="w-4 h-4"></i> New Note
+                        </button>
+                    </div>
                 </div>
+                <div id="notesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <p id="noNotes" class="text-slate-600 text-sm text-center py-12 font-mono hidden">Nothing here.</p>
+            </div>
+
+            <!-- ── Generator Tab ── -->
+            <div id="view-generator" class="tab-view hidden fade-in space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-xl font-bold text-white">Password Generator</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Cryptographically random password synthesis engine</p>
+                </div>
+                <div class="max-w-lg space-y-5">
+                    <div class="flex gap-3">
+                        <input id="generatedPassword" type="text" readonly
+                            class="flex-1 bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 font-mono text-sm text-indigo-300 focus:outline-none tracking-wider select-all"
+                            placeholder="Click Generate to synthesize...">
+                        <button onclick="copyGenerated()" class="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 transition-all text-xs font-semibold">Copy</button>
+                    </div>
+
+                    <!-- Strength meter -->
+                    <div>
+                        <div class="flex justify-between text-xs font-mono text-slate-500 mb-1.5">
+                            <span>STRENGTH METRIC</span>
+                            <span id="strengthLabel">—</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div id="strengthBar" class="strength-bar h-full rounded-full w-0 bg-slate-600"></div>
+                        </div>
+                    </div>
+
+                    <!-- Options -->
+                    <div class="grid grid-cols-2 gap-4 text-sm text-slate-300">
+                        <div>
+                            <label class="block text-xs text-slate-500 font-mono mb-1.5">LENGTH: <span id="lengthVal">20</span></label>
+                            <input type="range" id="pwdLength" min="8" max="64" value="20"
+                                oninput="document.getElementById('lengthVal').textContent=this.value"
+                                class="w-full accent-indigo-500 cursor-pointer">
+                        </div>
+                        <div class="space-y-2 pt-1">
+                            <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                <input type="checkbox" id="useUpper" checked class="accent-indigo-500"> Uppercase (A–Z)
+                            </label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                <input type="checkbox" id="useNumbers" checked class="accent-indigo-500"> Numbers (0–9)
+                            </label>
+                            <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                <input type="checkbox" id="useSymbols" checked class="accent-indigo-500"> Symbols (!@#$)
+                            </label>
+                        </div>
+                    </div>
+
+                    <button onclick="generatePassword()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+                        <i data-lucide="zap" class="w-4 h-4"></i> Generate Secure Password
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── System Ledger Tab ── -->
+            <div id="view-changelog" class="tab-view hidden fade-in space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-xl font-bold text-white">System Lifecycle Ledger</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Build history, patching records, and engine version metrics</p>
+                </div>
+                <div class="space-y-4 font-mono text-xs">
+                    <div class="p-5 bg-slate-950/40 border border-indigo-500/20 rounded-xl space-y-3">
+                        <div class="flex flex-wrap justify-between text-indigo-400 font-semibold text-sm gap-2">
+                            <span>🚀 v1.2.0 — Core Engine Transformation</span>
+                            <span class="text-slate-500">2026-06-07</span>
+                        </div>
+                        <p class="text-slate-400">Refactored target infrastructure from Azure CI/CD orchestration to native standalone offline application.</p>
+                        <ul class="list-disc list-inside text-slate-500 space-y-1.5 pl-1">
+                            <li>Implemented 4-digit numeric Security PIN lock gate with keypad UI.</li>
+                            <li>Added Password Strength Metric bar with real-time scoring.</li>
+                            <li>Added Secure Notes with Active / Archive / Recycle Bin state filters.</li>
+                            <li>Integrated cryptographic Password Generator engine (length, charset options).</li>
+                            <li>Windows packaging via <code class="text-indigo-400">pkg</code>: spawns bundled vault.exe daemon internally.</li>
+                        </ul>
+                    </div>
+                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-3">
+                        <div class="flex flex-wrap justify-between text-slate-400 font-semibold text-sm gap-2">
+                            <span>⚙️ v1.1.0 — Web Application Layer</span>
+                            <span class="text-slate-500">2026-06-07</span>
+                        </div>
+                        <p class="text-slate-500">Added Express API backend and Glassmorphism Tailwind UI dashboard, Docker Compose orchestration.</p>
+                    </div>
+                    <div class="p-5 bg-slate-950/40 border border-slate-800/60 rounded-xl space-y-3">
+                        <div class="flex flex-wrap justify-between text-slate-400 font-semibold text-sm gap-2">
+                            <span>🔐 v1.0.0 — Pipeline Refactor</span>
+                            <span class="text-slate-500">2026-06-07</span>
+                        </div>
+                        <p class="text-slate-500">Pivoted from Azure infrastructure provisioning to Enterprise Password Saver via Jenkins + Vault AppRole.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ═══ PASSWORD MODAL ═══ -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="key" class="w-5 h-5 text-indigo-400"></i> Store New Credential
+            </h3>
+            <input id="pwdLabel" type="text" placeholder="Application Label (e.g., GitHub Enterprise)"
+                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            <input id="pwdUser" type="text" placeholder="Username / Email"
+                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            <div class="relative">
+                <input id="pwdVal" type="text" placeholder="Secure Password String" oninput="updateModalStrength(this.value)"
+                    class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors pr-20">
+                <button onclick="fillGeneratedInModal()" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-700 hover:bg-indigo-600 text-white px-2 py-1 rounded-lg font-mono transition-all">GEN</button>
+            </div>
+            <!-- Inline strength bar for modal -->
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div id="modalStrengthBar" class="strength-bar h-full rounded-full w-0 bg-slate-600"></div>
+            </div>
+            <div class="flex justify-end gap-2 text-xs font-semibold pt-1">
+                <button onclick="closePasswordModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">Cancel</button>
+                <button onclick="savePasswordRecord()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-lg shadow-indigo-600/20">Commit to Vault</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ NOTE MODAL ═══ -->
+    <div id="noteModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="sticky-note" class="w-5 h-5 text-emerald-400"></i> Write Secure Note
+            </h3>
+            <input id="noteTitle" type="text" placeholder="Note Title"
+                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
+            <textarea id="noteContent" rows="5" placeholder="Sensitive contents, tokens, or keys..."
+                class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors resize-none font-mono"></textarea>
+            <div class="flex justify-end gap-2 text-xs font-semibold pt-1">
+                <button onclick="closeNoteModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">Cancel</button>
+                <button onclick="saveNoteRecord()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-lg shadow-emerald-600/20">Save Note</button>
             </div>
         </div>
     </div>
 
     <script>
-        lucide.createIcons();
+        // ── Constants ─────────────────────────────────────────────────────────
+        const MASTER_PIN = '2026';
+        let pinBuffer = '';
+        let passwordsState = [];
+        let notesState = [];
+        let currentNoteFilter = 'active';
+        let lastGenerated = '';
 
-        async function storeSecret() {
-            const body = {
-                path: document.getElementById('storePath').value,
-                key: document.getElementById('storeKey').value,
-                value: document.getElementById('storeValue').value
-            };
-            const res = await fetch('/api/secrets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
-            alert(data.message || data.error);
+        // ── PIN Gate Logic ────────────────────────────────────────────────────
+        function appendPIN(digit) {
+            if (pinBuffer.length >= 4) return;
+            pinBuffer += digit;
+            updatePINDots();
+            document.getElementById('pinCode').value = pinBuffer;
+            if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
         }
 
-        async function getSecret() {
-            const path = document.getElementById('getPath').value;
-            const key = document.getElementById('getKey').value;
-            const panel = document.getElementById('resultPanel');
-            const output = document.getElementById('secretOutput');
+        function clearPIN() {
+            pinBuffer = '';
+            document.getElementById('pinCode').value = '';
+            updatePINDots();
+            document.getElementById('pinError').classList.add('hidden');
+        }
 
-            // Encode path parts safely
-            const res = await fetch(`/api/secrets/${encodeURIComponent(path)}/${encodeURIComponent(key)}`);
-            const data = await res.json();
-            
-            if(data.success) {
-                panel.classList.remove('hidden');
-                output.textContent = data.value;
-            } else {
-                alert(data.error);
+        function onPINInput(val) {
+            pinBuffer = val;
+            updatePINDots();
+            if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
+        }
+
+        function updatePINDots() {
+            for (let i = 0; i < 4; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (i < pinBuffer.length) {
+                    dot.classList.add('bg-indigo-400', 'border-indigo-400');
+                    dot.classList.remove('bg-transparent', 'border-slate-700');
+                } else {
+                    dot.classList.remove('bg-indigo-400', 'border-indigo-400');
+                    dot.classList.add('bg-transparent', 'border-slate-700');
+                }
             }
         }
+
+        function verifyPIN() {
+            if (pinBuffer === MASTER_PIN) {
+                document.getElementById('lockScreen').classList.add('hidden');
+                document.getElementById('vaultDashboard').classList.remove('hidden');
+                lucide.createIcons();
+                switchTab('passwords');
+                loadAllVaultData();
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+                pinBuffer = '';
+                document.getElementById('pinCode').value = '';
+                updatePINDots();
+                // Shake the error indicator
+                setTimeout(() => document.getElementById('pinError').classList.add('hidden'), 2000);
+            }
+        }
+
+        // Keyboard support on lock screen
+        document.addEventListener('keydown', (e) => {
+            if (!document.getElementById('lockScreen').classList.contains('hidden')) {
+                if (e.key >= '0' && e.key <= '9') appendPIN(e.key);
+                if (e.key === 'Backspace') { pinBuffer = pinBuffer.slice(0, -1); updatePINDots(); }
+                if (e.key === 'Enter') verifyPIN();
+            }
+        });
+
+        // ── Tab Navigation ────────────────────────────────────────────────────
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border', 'border-indigo-500/20');
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const btn = document.getElementById(`tab-${tabId}`);
+            btn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border', 'border-indigo-500/20');
+        }
+
+        // ── Vault API Sync ────────────────────────────────────────────────────
+        async function loadAllVaultData() {
+            try {
+                const [pRes, nRes] = await Promise.all([
+                    fetch('/api/vault/load/passwords'),
+                    fetch('/api/vault/load/notes')
+                ]);
+                const pData = await pRes.json();
+                const nData = await nRes.json();
+                try { passwordsState = JSON.parse(JSON.parse(pData.data)); } catch { passwordsState = []; }
+                try { notesState = JSON.parse(JSON.parse(nData.data)); } catch { notesState = []; }
+                renderPasswords();
+                renderNotes();
+            } catch (e) {
+                console.error('Vault load error:', e);
+            }
+        }
+
+        async function syncWithVault(type, payload) {
+            await fetch('/api/vault/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, data: JSON.stringify(payload) })
+            });
+        }
+
+        // ── Password Strength Scoring ─────────────────────────────────────────
+        function scorePassword(pwd) {
+            if (!pwd) return { score: 0, label: '—', color: 'bg-slate-600' };
+            let score = 0;
+            if (pwd.length >= 8)  score++;
+            if (pwd.length >= 14) score++;
+            if (pwd.length >= 20) score++;
+            if (/[A-Z]/.test(pwd)) score++;
+            if (/[0-9]/.test(pwd)) score++;
+            if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+            const levels = [
+                { label: 'Very Weak',  color: 'bg-rose-600',   pct: '10%' },
+                { label: 'Weak',       color: 'bg-orange-500', pct: '25%' },
+                { label: 'Fair',       color: 'bg-yellow-500', pct: '45%' },
+                { label: 'Good',       color: 'bg-lime-500',   pct: '65%' },
+                { label: 'Strong',     color: 'bg-green-500',  pct: '82%' },
+                { label: 'Very Strong',color: 'bg-emerald-400','pct': '100%' },
+            ];
+            const idx = Math.min(score, levels.length - 1);
+            return { ...levels[idx], score };
+        }
+
+        function updateModalStrength(val) {
+            const { pct, color } = scorePassword(val);
+            const bar = document.getElementById('modalStrengthBar');
+            bar.style.width = pct;
+            bar.className = `strength-bar h-full rounded-full ${color}`;
+        }
+
+        // ── Password CRUD ─────────────────────────────────────────────────────
+        function openPasswordModal() { document.getElementById('passwordModal').classList.remove('hidden'); }
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+            ['pwdLabel','pwdUser','pwdVal'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('modalStrengthBar').style.width = '0';
+        }
+
+        function fillGeneratedInModal() {
+            const pwd = quickGenerate();
+            document.getElementById('pwdVal').value = pwd;
+            updateModalStrength(pwd);
+        }
+
+        async function savePasswordRecord() {
+            const label = document.getElementById('pwdLabel').value.trim();
+            const user  = document.getElementById('pwdUser').value.trim();
+            const val   = document.getElementById('pwdVal').value;
+            if (!label || !val) return alert('Label and Password are required.');
+
+            const { label: strengthLabel } = scorePassword(val);
+            passwordsState.push({ id: Date.now(), label, user, val, strength: strengthLabel });
+            await syncWithVault('passwords', passwordsState);
+            closePasswordModal();
+            renderPasswords();
+        }
+
+        async function deletePassword(id) {
+            if (!confirm('Permanently purge this credential?')) return;
+            passwordsState = passwordsState.filter(p => p.id !== id);
+            await syncWithVault('passwords', passwordsState);
+            renderPasswords();
+        }
+
+        function renderPasswords() {
+            const body = document.getElementById('passwordTableBody');
+            const empty = document.getElementById('noPasswords');
+            body.innerHTML = '';
+            if (passwordsState.length === 0) { empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+
+            passwordsState.forEach(p => {
+                const { pct, color } = scorePassword(p.val);
+                const tr = document.createElement('tr');
+                tr.className = 'group border-b border-slate-800/40 hover:bg-slate-900/30 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-3.5 pr-4 font-semibold text-white text-sm">${escHtml(p.label)}</td>
+                    <td class="py-3.5 pr-4 text-slate-400 text-sm">${escHtml(p.user || 'N/A')}</td>
+                    <td class="py-3.5 pr-4 font-mono text-xs text-indigo-300 max-w-[160px] truncate select-all" title="${escHtml(p.val)}">${escHtml(p.val)}</td>
+                    <td class="py-3.5 pr-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="strength-bar h-full rounded-full ${color}" style="width:${pct}"></div>
+                            </div>
+                            <span class="text-[10px] font-mono text-slate-500">${p.strength || '—'}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 text-right">
+                        <button onclick="deletePassword(${p.id})" class="text-xs text-rose-400 hover:text-rose-300 font-semibold transition-colors px-2 py-1 rounded-lg hover:bg-rose-900/20">Purge</button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        // ── Notes CRUD ────────────────────────────────────────────────────────
+        function openNoteModal()  { document.getElementById('noteModal').classList.remove('hidden'); }
+        function closeNoteModal() {
+            document.getElementById('noteModal').classList.add('hidden');
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+        }
+
+        function setNoteFilter(filter) {
+            currentNoteFilter = filter;
+            document.querySelectorAll('.note-filter-btn').forEach(b => {
+                b.classList.remove('bg-slate-700', 'text-white');
+                b.classList.add('text-slate-400');
+            });
+            document.getElementById(`filter-${filter}`).classList.add('bg-slate-700', 'text-white');
+            document.getElementById(`filter-${filter}`).classList.remove('text-slate-400');
+            renderNotes();
+        }
+
+        async function saveNoteRecord() {
+            const title   = document.getElementById('noteTitle').value.trim();
+            const content = document.getElementById('noteContent').value.trim();
+            if (!title || !content) return alert('Title and content are required.');
+            notesState.push({ id: Date.now(), title, content, status: 'active', created: new Date().toLocaleDateString() });
+            await syncWithVault('notes', notesState);
+            closeNoteModal();
+            renderNotes();
+        }
+
+        async function updateNoteStatus(id, newStatus) {
+            notesState = notesState.map(n => n.id === id ? { ...n, status: newStatus } : n);
+            await syncWithVault('notes', notesState);
+            renderNotes();
+        }
+
+        async function purgeNotePermanently(id) {
+            if (!confirm('Permanently delete this note? This cannot be undone.')) return;
+            notesState = notesState.filter(n => n.id !== id);
+            await syncWithVault('notes', notesState);
+            renderNotes();
+        }
+
+        function renderNotes() {
+            const grid  = document.getElementById('notesGrid');
+            const empty = document.getElementById('noNotes');
+            grid.innerHTML = '';
+            const filtered = notesState.filter(n => n.status === currentNoteFilter);
+            if (filtered.length === 0) { empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+
+            filtered.forEach(n => {
+                const card = document.createElement('div');
+                card.className = 'p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between min-h-[150px] hover:border-slate-700/60 transition-colors';
+
+                let actions = '';
+                if (n.status === 'active') {
+                    actions = `<button onclick="updateNoteStatus(${n.id},'archive')" class="text-xs text-amber-400 hover:underline font-semibold">Archive</button>
+                               <button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
+                } else if (n.status === 'archive') {
+                    actions = `<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button>
+                               <button onclick="updateNoteStatus(${n.id},'bin')" class="text-xs text-rose-400 hover:underline font-semibold">Trash</button>`;
+                } else if (n.status === 'bin') {
+                    actions = `<button onclick="updateNoteStatus(${n.id},'active')" class="text-xs text-indigo-400 hover:underline font-semibold">Restore</button>
+                               <button onclick="purgeNotePermanently(${n.id})" class="text-xs text-rose-500 font-bold hover:underline">Purge Forever</button>`;
+                }
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-slate-100 text-sm leading-tight">${escHtml(n.title)}</h4>
+                            <span class="text-[10px] text-slate-600 font-mono shrink-0 ml-2">${n.created || ''}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 font-mono whitespace-pre-wrap line-clamp-4">${escHtml(n.content)}</p>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-3 border-t border-slate-800/40 mt-3">${actions}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ── Password Generator ────────────────────────────────────────────────
+        const CHARS = {
+            lower:   'abcdefghijklmnopqrstuvwxyz',
+            upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            numbers: '0123456789',
+            symbols: '!@#$%^&*()-_=+[]{}|;:,.<>?'
+        };
+
+        function quickGenerate() {
+            const len  = 20;
+            const pool = CHARS.lower + CHARS.upper + CHARS.numbers + CHARS.symbols;
+            return Array.from(crypto.getRandomValues(new Uint32Array(len)))
+                .map(v => pool[v % pool.length]).join('');
+        }
+
+        function generatePassword() {
+            const len     = parseInt(document.getElementById('pwdLength').value);
+            const useUp   = document.getElementById('useUpper').checked;
+            const useNum  = document.getElementById('useNumbers').checked;
+            const useSym  = document.getElementById('useSymbols').checked;
+
+            let pool = CHARS.lower;
+            if (useUp)  pool += CHARS.upper;
+            if (useNum) pool += CHARS.numbers;
+            if (useSym) pool += CHARS.symbols;
+
+            const pwd = Array.from(crypto.getRandomValues(new Uint32Array(len)))
+                .map(v => pool[v % pool.length]).join('');
+
+            lastGenerated = pwd;
+            document.getElementById('generatedPassword').value = pwd;
+
+            const { label, pct, color } = scorePassword(pwd);
+            document.getElementById('strengthLabel').textContent = label;
+            const bar = document.getElementById('strengthBar');
+            bar.style.width = pct;
+            bar.className = `strength-bar h-full rounded-full ${color}`;
+        }
+
+        function copyGenerated() {
+            const val = document.getElementById('generatedPassword').value;
+            if (!val) return;
+            navigator.clipboard.writeText(val).then(() => {
+                const btn = document.querySelector('#view-generator button:nth-of-type(1)');
+            });
+            alert('Copied to clipboard!');
+        }
+
+        // ── Utility ───────────────────────────────────────────────────────────
+        function escHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // Init Lucide icons on load
+        lucide.createIcons();
     </script>
 </body>
 </html>
