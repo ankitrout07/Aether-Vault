@@ -1,6 +1,6 @@
-# password-saver-policy.hcl
-# Enterprise Password Saver — Hardened Access Policy
-# Load with: vault policy write jenkins-policy vault/policies/password-saver-policy.hcl
+# quantum-vault-policy.hcl
+# Quantum Vault — Hardened Access Policy
+# Load with: vault policy write jenkins-policy vault/policies/quantum-vault-policy.hcl
 
 # Allow full CRUD capabilities over the custom application password space
 path "internal/data/app-passwords/*" {

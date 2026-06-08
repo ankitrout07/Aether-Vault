@@ -11,8 +11,8 @@ An ultra-secure, completely offline, zero-trust password manager and credential 
 QuantumVault is pre-compiled into a portable Windows executable. **No Node.js, no Docker, and no external dependencies are required to run it.**
 
 1. **Pull this repository** onto your Windows workstation.
-2. Navigate to the `dist/` folder: `dist/password-saver.exe`
-3. **Double-click `password-saver.exe`**.
+2. Navigate to the `dist/` folder: `dist/quantum-vault.exe`
+3. **Double-click `quantum-vault.exe`**.
     - This will silently spawn the background HashiCorp Vault daemon and the Express middleware server.
 4. **Open your web browser** and go to: `http://127.0.0.1:3000`
 5. **Enter the Master PIN (`2026`)** to unlock your vault.
@@ -94,7 +94,7 @@ If you modify `public/index.html` or `server.js`, you must recompile the `.exe` 
 npm run build-win
 ```
 
-This command will output a new `password-saver.exe` inside the `dist/` directory. You can then `git commit` and `git push` the binary so it's ready for download on your Windows machine.
+This command will output a new `quantum-vault.exe` inside the `dist/` directory. You can then `git commit` and `git push` the binary so it's ready for download on your Windows machine.
 
 ---
 

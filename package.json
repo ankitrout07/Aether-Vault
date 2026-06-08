@@ -1,12 +1,12 @@
 {
-  "name": "enterprise-offline-vault",
+  "name": "quantum-vault",
   "version": "1.2.0",
   "description": "Secure Offline Password Manager and Desktop Vault",
   "main": "server.js",
   "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build-win": "pkg . --targets node18-win-x64 --output dist/password-saver.exe"
+    "build-win": "pkg . --targets node18-win-x64 --output dist/quantum-vault.exe"
   },
   "dependencies": {
     "axios": "^1.7.2",

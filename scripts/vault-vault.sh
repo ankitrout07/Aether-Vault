@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/vault-vault.sh — Enterprise Password Saver CLI
+# scripts/vault-vault.sh — Quantum Vault CLI
 # Terminal utility for secure secret storage and retrieval on NTZ-LINUX-003.
 #
 # Usage:
@@ -19,7 +19,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 usage() {
     echo ""
-    echo -e "${YELLOW}Enterprise Password Saver — Vault CLI${NC}"
+    echo -e "${YELLOW}Quantum Vault — Vault CLI${NC}"
     echo "────────────────────────────────────────"
     echo "Usage:"
     echo "  $0 store [path] [key] [value]"

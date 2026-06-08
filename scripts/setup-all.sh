@@ -1,10 +1,10 @@
 #!/bin/bash
-# scripts/setup-all.sh — Master Orchestration: Enterprise Password Saver Setup
+# scripts/setup-all.sh — Master Orchestration: Quantum Vault Setup
 
 set -e
 
 echo "===================================================="
-echo "   ENTERPRISE PASSWORD SAVER SETUP: VAULT + JENKINS"
+echo "   QUANTUM VAULT SETUP: VAULT + JENKINS"
 echo "===================================================="
 
 # ── Step 1: Install Vault & register systemd service ────────────────────────
@@ -52,9 +52,9 @@ else
     echo "Vault is already unsealed."
 fi
 
-# ── Step 3: Apply password saver configuration ───────────────────────────────
+# ── Step 3: Apply quantum vault configuration ───────────────────────────────
 echo ""
-echo "--- Step 3: Configuring Vault for Enterprise Password Saver ---"
+echo "--- Step 3: Configuring Vault for Quantum Vault ---"
 echo "Please enter your VAULT_ROOT_TOKEN to proceed:"
 read -rs ROOT_TOKEN
 export VAULT_TOKEN="$ROOT_TOKEN"
@@ -82,7 +82,7 @@ fi
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "===================================================="
-echo "   SETUP COMPLETE — ENTERPRISE PASSWORD SAVER READY"
+echo "   SETUP COMPLETE — QUANTUM VAULT READY"
 echo "===================================================="
 echo ""
 echo "Next steps:"

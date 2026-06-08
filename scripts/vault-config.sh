@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/vault-config.sh — Vault Internal Configuration for Enterprise Password Saver
+# scripts/vault-config.sh — Vault Internal Configuration for Quantum Vault
 #
 # Prerequisites:
 #   1. Vault must be running and unsealed.
@@ -8,7 +8,7 @@
 export VAULT_ADDR='http://127.0.0.1:8200'
 
 echo "==================================================="
-echo "   ENTERPRISE PASSWORD SAVER: VAULT CONFIGURATION"
+echo "   QUANTUM VAULT: VAULT CONFIGURATION"
 echo "==================================================="
 
 # 1. Enable KV-V2 Secrets Engine
@@ -21,13 +21,13 @@ echo ""
 echo "Step 2: Enabling AppRole Authentication"
 vault auth enable approle || echo "  → AppRole already enabled, skipping."
 
-# 3. Apply Password Saver Policy
+# 3. Apply Quantum Vault Policy
 echo ""
-echo "Step 3: Applying Password Saver Policy (jenkins-policy)"
-vault policy write jenkins-policy vault/policies/password-saver-policy.hcl
-echo "  → Policy 'jenkins-policy' written from password-saver-policy.hcl"
+echo "Step 3: Applying Quantum Vault Policy (jenkins-policy)"
+vault policy write jenkins-policy vault/policies/quantum-vault-policy.hcl
+echo "  → Policy 'jenkins-policy' written from quantum-vault-policy.hcl"
 
-# 4. Create Jenkins AppRole (scoped to password saver policy)
+# 4. Create Jenkins AppRole (scoped to quantum vault policy)
 echo ""
 echo "Step 4: Creating Jenkins AppRole"
 vault write auth/approle/role/jenkins-role \
