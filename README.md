@@ -1,18 +1,18 @@
-# 🔐 QuantumVault — Offline Enterprise Password Manager
+# 🔐 AetherVault — Offline Enterprise Password Manager
 
 An ultra-secure, completely offline, zero-trust password manager and credential vault designed for single-user enterprise workstations.
 
-**QuantumVault** runs as a standalone, self-contained Windows executable (`.exe`). It acts as a wrapper around the HashiCorp Vault KV-V2 engine, utilizing loopback-only connections (`127.0.0.1`) and an Express API gateway to provide a stunning Glassmorphism UI for managing your most sensitive credentials, securely and offline.
+**AetherVault** runs as a standalone, self-contained Windows executable (`.exe`). It acts as a wrapper around the HashiCorp Vault KV-V2 engine, utilizing loopback-only connections (`127.0.0.1`) and an Express API gateway to provide a stunning Glassmorphism UI for managing your most sensitive credentials, securely and offline.
 
 ---
 
 ## 🚀 Quick Start (Windows Setup)
 
-QuantumVault is pre-compiled into a portable Windows executable. **No Node.js, no Docker, and no external dependencies are required to run it.**
+AetherVault is pre-compiled into a portable Windows executable. **No Node.js, no Docker, and no external dependencies are required to run it.**
 
 1. **Pull this repository** onto your Windows workstation.
-2. Navigate to the `dist/` folder: `dist/quantum-vault.exe`
-3. **Double-click `quantum-vault.exe`**.
+2. Navigate to the `dist/` folder: `dist/aether-vault.exe`
+3. **Double-click `aether-vault.exe`**.
     - This will silently spawn the background HashiCorp Vault daemon and the Express middleware server.
 4. **Open your web browser** and go to: `http://127.0.0.1:3000`
 5. **Enter the Master PIN (`2026`)** to unlock your vault.
@@ -21,7 +21,7 @@ QuantumVault is pre-compiled into a portable Windows executable. **No Node.js, n
 
 ## 💎 Advanced Features (v1.3 Production Suite)
 
-QuantumVault v1.3 brings the platform to full parity with industry-standard Enterprise Password Managers, utilizing a combination of local browser cryptography and automated memory hardening.
+AetherVault v1.3 brings the platform to full parity with industry-standard Enterprise Password Managers, utilizing a combination of local browser cryptography and automated memory hardening.
 
 | Feature | Description |
 | :--- | :--- |
@@ -37,11 +37,11 @@ QuantumVault v1.3 brings the platform to full parity with industry-standard Ente
 
 ## 🏗️ Technical Architecture
 
-QuantumVault leverages a layered, zero-trust security model:
+AetherVault leverages a layered, zero-trust security model:
 
 ```
                   +------------------------------------------+
-                  |         QuantumVault UI Layer            |
+                  |         AetherVault UI Layer            |
                   |  (Tailwind + Vanilla JS + Glassmorphism) |
                   +------------------------------------------+
                     /                  |                 \
@@ -94,7 +94,7 @@ If you modify `public/index.html` or `server.js`, you must recompile the `.exe` 
 npm run build-win
 ```
 
-This command will output a new `quantum-vault.exe` inside the `dist/` directory. You can then `git commit` and `git push` the binary so it's ready for download on your Windows machine.
+This command will output a new `aether-vault.exe` inside the `dist/` directory. You can then `git commit` and `git push` the binary so it's ready for download on your Windows machine.
 
 ---
 

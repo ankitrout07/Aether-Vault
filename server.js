@@ -110,7 +110,7 @@ app.post('/api/backup/export', async (req, res) => {
             data: encrypted
         });
 
-        const filename = `quantum-vault-backup-${Date.now()}.qvbak`;
+        const filename = `aether-vault-backup-${Date.now()}.qvbak`;
         fs.writeFileSync(path.join(BACKUP_DIR, filename), backupData);
         res.json({ success: true, message: `Backup saved to ${filename}` });
     } catch (err) {
