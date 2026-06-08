@@ -233,18 +233,22 @@
                             <span class="text-[10px] text-slate-500 font-mono">SCORE</span>
                         </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                    <div class="grid grid-cols-4 gap-3">
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[70px]">
                             <div id="auditWeak" class="text-2xl font-bold text-rose-400">0</div>
                             <div class="text-xs text-slate-500 font-mono mt-1">WEAK</div>
                         </div>
-                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[70px]">
                             <div id="auditDup" class="text-2xl font-bold text-amber-400">0</div>
                             <div class="text-xs text-slate-500 font-mono mt-1">DUPLICATES</div>
                         </div>
-                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[80px]">
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center min-w-[70px]">
                             <div id="auditShort" class="text-2xl font-bold text-orange-400">0</div>
                             <div class="text-xs text-slate-500 font-mono mt-1">TOO SHORT</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-900/40 border border-red-900/40 text-center min-w-[70px]">
+                            <div id="auditPwned" class="text-2xl font-bold text-red-400">0</div>
+                            <div class="text-xs text-red-500/70 font-mono mt-1">PWNED</div>
                         </div>
                     </div>
                 </div>
@@ -1225,22 +1229,52 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  MODULE 1 — PASSWORD HYGIENE AUDITOR
+    //  MODULE 1 — PASSWORD HYGIENE AUDITOR + BREACH CHECK (k-Anonymity)
     // ═══════════════════════════════════════════════════════════
-    function runAudit() {
-        let weakCount=0, dupCount=0, shortCount=0;
+    let breachIndex = null;
+
+    async function loadBreachIndex() {
+        if (breachIndex) return breachIndex;
+        try {
+            const res = await fetch('breach-index.json');
+            breachIndex = await res.json();
+        } catch(e) {
+            breachIndex = {};
+        }
+        return breachIndex;
+    }
+
+    async function isPwned(password) {
+        try {
+            const enc = new TextEncoder();
+            const hashBuf = await crypto.subtle.digest('SHA-1', enc.encode(password));
+            const hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+            const prefix = hex.slice(0, 5);
+            const suffix = hex.slice(5);
+            const index = await loadBreachIndex();
+            const bucket = index[prefix] || [];
+            return bucket.includes(suffix);
+        } catch(e) { return false; }
+    }
+
+    async function runAudit() {
+        let weakCount=0, dupCount=0, shortCount=0, pwnedCount=0;
         const violations=[];
 
         // Build duplicate value map
         const valMap={};
         passwordsState.forEach(p=>{ if(!valMap[p.val]) valMap[p.val]=[]; valMap[p.val].push(p.label); });
 
-        passwordsState.forEach(p=>{
+        // Run breach check for all passwords in parallel
+        const pwnedResults = await Promise.all(passwordsState.map(p => isPwned(p.val)));
+
+        passwordsState.forEach((p, i)=>{
             const issues=[];
             const {score}=scorePassword(p.val);
             if(score<3){ issues.push({type:'WEAK',badge:'bg-rose-900/30 text-rose-300 border-rose-500/20'}); weakCount++; }
             if(p.val.length<10){ issues.push({type:'TOO SHORT',badge:'bg-orange-900/30 text-orange-300 border-orange-500/20'}); shortCount++; }
             if(valMap[p.val].length>1){ issues.push({type:'DUPLICATE',badge:'bg-amber-900/30 text-amber-300 border-amber-500/20'}); dupCount++; }
+            if(pwnedResults[i]){ issues.push({type:'⚠ PWNED',badge:'bg-red-950/60 text-red-300 border-red-500/40'}); pwnedCount++; }
             if(issues.length) violations.push({...p,issues});
         });
 
@@ -1259,6 +1293,7 @@
         document.getElementById('auditWeak').textContent=weakCount;
         document.getElementById('auditDup').textContent=dupCount;
         document.getElementById('auditShort').textContent=shortCount;
+        document.getElementById('auditPwned').textContent=pwnedCount;
 
         const list=document.getElementById('auditList'), clean=document.getElementById('auditClean');
         list.innerHTML='';
