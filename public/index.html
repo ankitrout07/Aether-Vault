@@ -35,32 +35,23 @@
             <i data-lucide="shield-alert" class="w-12 h-12"></i>
         </div>
         <h2 class="text-2xl font-bold text-white mb-1 tracking-widest uppercase">QuantumVault</h2>
-        <p class="text-slate-500 text-xs mb-7 tracking-wide">OFFLINE · ISOLATED · ZERO-TRUST</p>
-
-        <div class="flex justify-center gap-3 mb-6">
-            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-0"></div>
-            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-1"></div>
-            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-2"></div>
-            <div class="w-4 h-4 rounded-full border-2 border-slate-700 bg-transparent" id="dot-3"></div>
+        <div class="space-y-4 mb-6 text-left">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Local Master Keyfile (Optional)</label>
+                <input id="keyfile" type="file" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700 transition-all cursor-pointer">
+            </div>
+            
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Passphrase / PIN</label>
+                <input id="pinCode" type="password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-3 text-sm text-center text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors tracking-[0.3em]">
+            </div>
         </div>
 
-        <input type="password" maxlength="4" id="pinCode" class="sr-only" autofocus inputmode="numeric" oninput="onPINInput(this.value)">
+        <button id="decryptBtn" onclick="verifyPIN()" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold tracking-wide shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex justify-center items-center gap-2">
+            <i data-lucide="unlock" class="w-4 h-4"></i> DECRYPT VAULT
+        </button>
 
-        <div class="grid grid-cols-3 gap-3 mb-6 text-white font-semibold text-lg select-none">
-            <button onclick="appendPIN('1')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">1</button>
-            <button onclick="appendPIN('2')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">2</button>
-            <button onclick="appendPIN('3')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">3</button>
-            <button onclick="appendPIN('4')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">4</button>
-            <button onclick="appendPIN('5')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">5</button>
-            <button onclick="appendPIN('6')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">6</button>
-            <button onclick="appendPIN('7')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">7</button>
-            <button onclick="appendPIN('8')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">8</button>
-            <button onclick="appendPIN('9')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">9</button>
-            <button onclick="clearPIN()" class="py-3 rounded-xl bg-rose-900/30 hover:bg-rose-800/40 text-rose-400 transition-all text-sm active:scale-95">CLR</button>
-            <button onclick="appendPIN('0')" class="py-3 rounded-xl bg-slate-800/60 hover:bg-indigo-600/30 transition-all active:scale-95">0</button>
-            <button onclick="verifyPIN()" class="py-3 rounded-xl bg-indigo-600/60 hover:bg-indigo-500 text-indigo-200 transition-all active:scale-95 text-sm">↵</button>
-        </div>
-        <p id="pinError" class="text-rose-400 text-xs font-mono hidden">ACCESS DENIED — INVALID PIN</p>
+        <p id="pinError" class="hidden text-rose-400 text-xs font-bold mt-4 animate-bounce">Access Denied. Invalid key combination.</p>
         <p class="text-slate-600 text-xs mt-4 font-mono">SYSTEM ISOLATED · 127.0.0.1</p>
     </div>
 
@@ -92,6 +83,9 @@
                     </button>
                     <button onclick="switchTab('audit')" id="tab-audit" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i> Vault Audit
+                    </button>
+                    <button onclick="switchTab('backup')" id="tab-backup" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
+                        <i data-lucide="hard-drive" class="w-4 h-4 shrink-0"></i> Backup & Restore
                     </button>
                     <button onclick="switchTab('changelog')" id="tab-changelog" class="tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white transition-all text-sm font-medium">
                         <i data-lucide="terminal" class="w-4 h-4 shrink-0"></i> System Ledger
@@ -250,6 +244,44 @@
                 <p id="auditClean" class="hidden text-emerald-400 text-sm font-mono text-center py-6">✓ All credentials pass hygiene checks. Vault is clean.</p>
             </div>
 
+            <!-- ── Backup & Restore Tab ── -->
+            <div id="view-backup" class="tab-view hidden fade-in space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-xl font-bold text-white">Local Encrypted Backup</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">AES-256-GCM hardware-encrypted backups dumped locally</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Export Box -->
+                    <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl space-y-4">
+                        <h3 class="text-md font-semibold text-white flex items-center gap-2"><i data-lucide="download-cloud" class="w-4 h-4 text-emerald-400"></i> Export Vault</h3>
+                        <p class="text-xs text-slate-400">Creates a secure .qvbak file encrypted with your passphrase.</p>
+                        <input id="exportPassphrase" type="password" placeholder="Master Backup Passphrase" class="w-full bg-slate-950 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors">
+                        <button onclick="exportBackup()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all flex justify-center items-center gap-2 shadow-lg shadow-emerald-600/20">
+                            <i data-lucide="save" class="w-4 h-4"></i> Generate Local Backup
+                        </button>
+                    </div>
+
+                    <!-- Import Box -->
+                    <div class="p-6 bg-slate-900/50 border border-rose-900/30 rounded-2xl space-y-4">
+                        <h3 class="text-md font-semibold text-rose-400 flex items-center gap-2"><i data-lucide="upload-cloud" class="w-4 h-4"></i> Restore Vault</h3>
+                        <p class="text-xs text-slate-400">WARNING: Restoring will completely overwrite the active vault.</p>
+                        
+                        <div class="flex gap-2">
+                            <select id="importFile" class="flex-1 bg-slate-950 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-rose-500 transition-colors appearance-none cursor-pointer">
+                                <option value="">Select Backup File...</option>
+                            </select>
+                            <button onclick="loadBackupList()" class="px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition-colors"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+                        </div>
+
+                        <input id="importPassphrase" type="password" placeholder="Master Backup Passphrase" class="w-full bg-slate-950 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-rose-500 transition-colors">
+                        <button onclick="importBackup()" class="w-full bg-rose-600 hover:bg-rose-500 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all flex justify-center items-center gap-2 shadow-lg shadow-rose-600/20">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i> Restore & Overwrite
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── System Ledger Tab ── -->
             <div id="view-changelog" class="tab-view hidden fade-in space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -285,15 +317,52 @@
 
     <!-- ═══ PASSWORD MODAL ═══ -->
     <div id="passwordModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in">
+        <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4 fade-in max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="key" class="w-5 h-5 text-indigo-400"></i> Store New Credential</h3>
-            <input id="pwdLabel" type="text" placeholder="Application Label (e.g., GitHub Enterprise)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-            <input id="pwdUser" type="text" placeholder="Username / Email" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
-            <div class="relative">
-                <input id="pwdVal" type="text" placeholder="Password" oninput="updateModalStrength(this.value)"
-                    class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors pr-20">
-                <button onclick="fillGeneratedInModal()" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-700 hover:bg-indigo-600 text-white px-2 py-1 rounded-lg font-mono transition-all">GEN</button>
+            
+            <select id="pwdCategory" onchange="toggleCategoryFields()" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer">
+                <option value="login">General Login</option>
+                <option value="server">Server Node</option>
+                <option value="card">Bank Card</option>
+                <option value="software">Software License</option>
+            </select>
+
+            <input id="pwdLabel" type="text" placeholder="Item Label (e.g., GitHub Enterprise)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            
+            <!-- General Login Fields -->
+            <div id="cat-login" class="space-y-4">
+                <input id="pwdUser" type="text" placeholder="Username / Email" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <div class="relative">
+                    <input id="pwdVal" type="text" placeholder="Password" oninput="updateModalStrength(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors pr-20">
+                    <button onclick="fillGeneratedInModal()" class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] bg-indigo-700 hover:bg-indigo-600 text-white px-2 py-1 rounded-lg font-mono transition-all">GEN</button>
+                </div>
             </div>
+
+            <!-- Server Node Fields -->
+            <div id="cat-server" class="hidden space-y-4">
+                <input id="srvHost" type="text" placeholder="Host IP / Address" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <input id="srvPort" type="text" placeholder="SSH Port (e.g., 22)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <input id="srvPass" type="text" placeholder="Root Password" oninput="updateModalStrength(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <textarea id="srvKey" rows="3" placeholder="Private Key (.pem)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors resize-none"></textarea>
+            </div>
+
+            <!-- Bank Card Fields -->
+            <div id="cat-card" class="hidden space-y-4">
+                <input id="crdNum" type="text" placeholder="Card Number" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <div class="flex gap-2">
+                    <input id="crdExp" type="text" placeholder="MM/YY" class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                    <input id="crdCvv" type="text" placeholder="CVV" class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                </div>
+                <input id="crdPin" type="text" placeholder="ATM PIN" oninput="updateModalStrength(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+            </div>
+
+            <!-- Software License Fields -->
+            <div id="cat-software" class="hidden space-y-4">
+                <input id="swKey" type="text" placeholder="License Key" oninput="updateModalStrength(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <input id="swUrl" type="text" placeholder="Activation URL" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors">
+                <textarea id="swDocs" rows="3" placeholder="Purchase Documentation / Notes" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors resize-none"></textarea>
+            </div>
+
             <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div id="modalStrengthBar" class="strength-bar h-full rounded-full w-0 bg-slate-600"></div>
             </div>
@@ -341,14 +410,13 @@
     // ═══════════════════════════════════════════════════════════
 
     // ── Constants ──────────────────────────────────────────────
-    const MASTER_PIN        = '2026';
-    const INACTIVITY_MS     = 5 * 60 * 1000;   // 5 minutes
+    const INACTIVITY_MS     = 300000;
     const CLIPBOARD_WIPE_MS = 30 * 1000;        // 30 seconds
     const AUDIT_CIRC        = 2 * Math.PI * 54; // audit ring r=54
     const TOTP_CIRC         = 2 * Math.PI * 20; // totp ring  r=20
 
     // ── State ──────────────────────────────────────────────────
-    let pinBuffer         = '';
+    let vaultMasterKey    = null;
     let passwordsState    = [];
     let notesState        = [];
     let totpState         = [];
@@ -388,7 +456,7 @@
     function lockVault(expired = false) {
         // Wipe all sensitive in-memory state
         passwordsState = []; notesState = []; totpState = [];
-        pinBuffer = '';
+        vaultMasterKey = null;
         clearTimeout(inactivityTimer);
         clearInterval(sessionInterval);
         clearInterval(totpTickInterval);
@@ -396,7 +464,7 @@
         document.getElementById('vaultDashboard').classList.add('hidden');
         document.getElementById('lockScreen').classList.remove('hidden');
         document.getElementById('pinCode').value = '';
-        updatePINDots();
+        document.getElementById('keyfile').value = '';
 
         if (expired) {
             const banner = document.getElementById('sessionBanner');
@@ -465,54 +533,101 @@
     function removeToast(id) { document.getElementById(id)?.remove(); }
 
     // ═══════════════════════════════════════════════════════════
-    //  PIN GATE
+    //  CRYPTO ENGINE
     // ═══════════════════════════════════════════════════════════
-    function appendPIN(d) {
-        if (pinBuffer.length >= 4) return;
-        pinBuffer += d;
-        updatePINDots();
-        document.getElementById('pinCode').value = pinBuffer;
-        if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
-    }
-    function clearPIN() {
-        pinBuffer = '';
-        document.getElementById('pinCode').value = '';
-        updatePINDots();
-        document.getElementById('pinError').classList.add('hidden');
-    }
-    function onPINInput(val) {
-        pinBuffer = val; updatePINDots();
-        if (pinBuffer.length === 4) setTimeout(verifyPIN, 120);
-    }
-    function updatePINDots() {
-        for (let i = 0; i < 4; i++) {
-            const d = document.getElementById(`dot-${i}`);
-            if (i < pinBuffer.length) { d.classList.add('bg-indigo-400','border-indigo-400'); d.classList.remove('bg-transparent','border-slate-700'); }
-            else { d.classList.remove('bg-indigo-400','border-indigo-400'); d.classList.add('bg-transparent','border-slate-700'); }
+    async function deriveMasterKey(pin, fileBuffer) {
+        const enc = new TextEncoder();
+        const pinData = enc.encode(pin);
+        
+        let fileHash = new Uint8Array(0);
+        if (fileBuffer) {
+            const hashBuf = await crypto.subtle.digest('SHA-256', fileBuffer);
+            fileHash = new Uint8Array(hashBuf);
         }
+        
+        const combined = new Uint8Array(pinData.length + fileHash.length);
+        combined.set(pinData);
+        combined.set(fileHash, pinData.length);
+        
+        const baseKey = await crypto.subtle.importKey('raw', combined, { name: 'PBKDF2' }, false, ['deriveKey']);
+        const salt = enc.encode("quantum-vault-static-salt-v1");
+        
+        return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: salt, iterations: 600000, hash: 'SHA-256' },
+            baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+        );
     }
-    function verifyPIN() {
-        if (pinBuffer === MASTER_PIN) {
+
+    async function wrapData(dataObj) {
+        if (!vaultMasterKey) return JSON.stringify(dataObj);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encData = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            vaultMasterKey,
+            new TextEncoder().encode(JSON.stringify(dataObj))
+        );
+        const combined = new Uint8Array(iv.length + encData.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(encData), iv.length);
+        return btoa(String.fromCharCode.apply(null, combined));
+    }
+
+    async function unwrapData(base64Str) {
+        if (!vaultMasterKey || typeof base64Str !== 'string') return base64Str;
+        if (base64Str.startsWith('[')) return JSON.parse(base64Str);
+        const raw = atob(base64Str);
+        const combined = new Uint8Array(raw.length);
+        for(let i=0; i<raw.length; i++) combined[i] = raw.charCodeAt(i);
+        
+        const iv = combined.slice(0, 12);
+        const data = combined.slice(12);
+        
+        const decBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            vaultMasterKey, data
+        );
+        return JSON.parse(new TextDecoder().decode(decBuffer));
+    }
+
+    async function verifyPIN() {
+        const pin = document.getElementById('pinCode').value;
+        const fileInput = document.getElementById('keyfile');
+        if (!pin) return;
+        
+        document.getElementById('decryptBtn').innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> DECRYPTING...';
+        lucide.createIcons();
+        
+        try {
+            let fileBuffer = null;
+            if (fileInput.files.length > 0) fileBuffer = await fileInput.files[0].arrayBuffer();
+            
+            vaultMasterKey = await deriveMasterKey(pin, fileBuffer);
+            
+            await loadAllVaultData();
+            
             document.getElementById('lockScreen').classList.add('hidden');
             document.getElementById('vaultDashboard').classList.remove('hidden');
             lucide.createIcons();
             switchTab('passwords');
-            loadAllVaultData();
             resetInactivityTimer();
             startTOTPTick();
-        } else {
-            document.getElementById('pinError').classList.remove('hidden');
-            pinBuffer = '';
             document.getElementById('pinCode').value = '';
-            updatePINDots();
-            setTimeout(() => document.getElementById('pinError').classList.add('hidden'), 2000);
+            fileInput.value = '';
+            showToast('Vault decrypted successfully', 'emerald');
+        } catch (e) {
+            console.error(e);
+            vaultMasterKey = null;
+            document.getElementById('pinError').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pinError').classList.add('hidden'), 3000);
+        } finally {
+            document.getElementById('decryptBtn').innerHTML = '<i data-lucide="unlock" class="w-4 h-4"></i> DECRYPT VAULT';
+            lucide.createIcons();
         }
     }
+
     document.addEventListener('keydown', e => {
-        if (!document.getElementById('lockScreen').classList.contains('hidden')) {
-            if (e.key >= '0' && e.key <= '9') appendPIN(e.key);
-            if (e.key === 'Backspace') { pinBuffer = pinBuffer.slice(0,-1); updatePINDots(); }
-            if (e.key === 'Enter') verifyPIN();
+        if (!document.getElementById('lockScreen').classList.contains('hidden') && e.key === 'Enter') {
+            verifyPIN();
         }
     });
 
@@ -526,6 +641,7 @@
         document.getElementById(`tab-${id}`).classList.add('bg-indigo-600/10','text-indigo-400','border','border-indigo-500/20');
         if (id === 'audit') runAudit();
         if (id === 'totp')  renderTOTP();
+        if (id === 'backup') loadBackupList();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -538,17 +654,27 @@
                 fetch('/api/vault/load/notes').then(r=>r.json()),
                 fetch('/api/vault/load/totp').then(r=>r.json())
             ]);
-            try { passwordsState = JSON.parse(JSON.parse(p.data)); } catch { passwordsState=[]; }
-            try { notesState     = JSON.parse(JSON.parse(n.data)); } catch { notesState=[]; }
-            try { totpState      = JSON.parse(JSON.parse(t.data)); } catch { totpState=[]; }
+            
+            let pRaw = [], nRaw = [], tRaw = [];
+            try { pRaw = JSON.parse(p.data); } catch(e){}
+            try { nRaw = JSON.parse(n.data); } catch(e){}
+            try { tRaw = JSON.parse(t.data); } catch(e){}
+            
+            passwordsState = Array.isArray(pRaw) ? pRaw : await unwrapData(pRaw);
+            notesState     = Array.isArray(nRaw) ? nRaw : await unwrapData(nRaw);
+            totpState      = Array.isArray(tRaw) ? tRaw : await unwrapData(tRaw);
+            
             renderPasswords(); renderNotes(); renderTOTP();
         } catch(e) { console.error('Vault load error:',e); }
     }
     async function syncWithVault(type, payload) {
-        await fetch('/api/vault/save', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ type, data: JSON.stringify(payload) })
-        });
+        try {
+            const wrapped = await wrapData(payload);
+            await fetch('/api/vault/save', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ type, data: wrapped })
+            });
+        } catch(e) { console.error('Sync failed', e); }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -585,21 +711,59 @@
     function openPasswordModal()  { document.getElementById('passwordModal').classList.remove('hidden'); }
     function closePasswordModal() {
         document.getElementById('passwordModal').classList.add('hidden');
-        ['pwdLabel','pwdUser','pwdVal'].forEach(i => document.getElementById(i).value='');
+        ['pwdLabel','pwdUser','pwdVal','srvHost','srvPort','srvPass','srvKey','crdNum','crdExp','crdCvv','crdPin','swKey','swUrl','swDocs'].forEach(i => document.getElementById(i).value='');
+        document.getElementById('pwdCategory').value = 'login';
+        toggleCategoryFields();
         document.getElementById('modalStrengthBar').style.width='0';
+    }
+    function toggleCategoryFields() {
+        const cat = document.getElementById('pwdCategory').value;
+        ['login','server','card','software'].forEach(c => document.getElementById(`cat-${c}`).classList.add('hidden'));
+        document.getElementById(`cat-${cat}`).classList.remove('hidden');
     }
     function fillGeneratedInModal() {
         const pwd = quickGenerate();
-        document.getElementById('pwdVal').value = pwd;
+        const cat = document.getElementById('pwdCategory').value;
+        if (cat === 'login') document.getElementById('pwdVal').value = pwd;
+        if (cat === 'server') document.getElementById('srvPass').value = pwd;
+        if (cat === 'card') document.getElementById('crdPin').value = pwd;
+        if (cat === 'software') document.getElementById('swKey').value = pwd;
         updateModalStrength(pwd);
     }
     async function savePasswordRecord() {
         const label = document.getElementById('pwdLabel').value.trim();
-        const user  = document.getElementById('pwdUser').value.trim();
-        const val   = document.getElementById('pwdVal').value;
-        if (!label||!val) return alert('Label and Password are required.');
-        const { label:strengthLabel } = scorePassword(val);
-        passwordsState.push({ id:Date.now(), label, user, val, strength:strengthLabel });
+        const cat = document.getElementById('pwdCategory').value;
+        if (!label) return alert('Label is required.');
+        
+        let user='', val='', strengthLabel='—';
+        let extra = {};
+        if (cat === 'login') {
+            user = document.getElementById('pwdUser').value.trim();
+            val = document.getElementById('pwdVal').value;
+            if (!val) return alert('Password is required.');
+            strengthLabel = scorePassword(val).label;
+        } else if (cat === 'server') {
+            user = document.getElementById('srvHost').value.trim() + (document.getElementById('srvPort').value ? ':'+document.getElementById('srvPort').value : '');
+            val = document.getElementById('srvPass').value;
+            extra.key = document.getElementById('srvKey').value;
+            if (!val && !extra.key) return alert('Root Password or Private Key is required.');
+            strengthLabel = scorePassword(val || extra.key).label;
+        } else if (cat === 'card') {
+            user = document.getElementById('crdNum').value.trim();
+            val = document.getElementById('crdPin').value;
+            extra.exp = document.getElementById('crdExp').value;
+            extra.cvv = document.getElementById('crdCvv').value;
+            if (!user) return alert('Card Number is required.');
+            strengthLabel = scorePassword(val).label;
+        } else if (cat === 'software') {
+            user = document.getElementById('swUrl').value.trim();
+            val = document.getElementById('swKey').value;
+            extra.docs = document.getElementById('swDocs').value;
+            if (!val) return alert('License Key is required.');
+            strengthLabel = scorePassword(val).label;
+        }
+
+        passwordsState.push({ id:Date.now(), label, cat, user, val, extra, strength:strengthLabel });
         await syncWithVault('passwords', passwordsState);
         closePasswordModal();
         renderPasswords();
@@ -618,11 +782,21 @@
         if (!passwordsState.length) { empty.classList.remove('hidden'); return; }
         empty.classList.add('hidden');
         passwordsState.forEach(p => {
-            const { pct, color } = scorePassword(p.val);
+            const valToScore = p.val || (p.extra && p.extra.key) || '';
+            const { pct, color } = scorePassword(valToScore);
+            
+            const catIcons = {
+                'login': '<i data-lucide="log-in" class="w-4 h-4 text-indigo-400"></i>',
+                'server': '<i data-lucide="server" class="w-4 h-4 text-emerald-400"></i>',
+                'card': '<i data-lucide="credit-card" class="w-4 h-4 text-amber-400"></i>',
+                'software': '<i data-lucide="code" class="w-4 h-4 text-rose-400"></i>'
+            };
+            const icon = catIcons[p.cat || 'login'];
+
             const tr = document.createElement('tr');
             tr.className = 'group border-b border-slate-800/40 hover:bg-slate-900/30 transition-colors';
             tr.innerHTML = `
-                <td class="py-3.5 pr-4 font-semibold text-white text-sm">${escHtml(p.label)}</td>
+                <td class="py-3.5 pr-4 font-semibold text-white text-sm flex items-center gap-2">${icon} ${escHtml(p.label)}</td>
                 <td class="py-3.5 pr-4 text-slate-400 text-sm">${escHtml(p.user||'N/A')}</td>
                 <td class="py-3.5 pr-4 font-mono text-xs text-indigo-300">••••••••••</td>
                 <td class="py-3.5 pr-4">
@@ -635,8 +809,8 @@
                 </td>
                 <td class="py-3.5 text-right">
                     <div class="flex items-center justify-end gap-1">
-                        <button data-label="${escAttr(p.label)}" data-val="${escAttr(p.val)}" onclick="copyWithAutoPurge(this.dataset.val, this.dataset.label)"
-                            class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-900/20 transition-colors">Copy</button>
+                        <button data-label="${escAttr(p.label)}" data-val="${escAttr(valToScore)}" onclick="copyWithAutoPurge(this.dataset.val, this.dataset.label)"
+                            class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-900/20 transition-colors">Copy Secret</button>
                         <button onclick="deletePassword(${p.id})"
                             class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded-lg hover:bg-rose-900/20 transition-colors">Purge</button>
                     </div>
@@ -911,7 +1085,51 @@
     function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escAttr(str){ return String(str).replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/\\/g,'\\\\'); }
 
-    // Initialise
+    // ═══════════════════════════════════════════════════════════
+    //  BACKUP & RESTORE
+    // ═══════════════════════════════════════════════════════════
+    async function exportBackup() {
+        const passphrase = document.getElementById('exportPassphrase').value;
+        if (!passphrase) return alert('Passphrase is required to encrypt backup.');
+        try {
+            const res = await fetch('/api/backup/export', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({passphrase}) }).then(r=>r.json());
+            if (res.success) {
+                showToast(res.message, 'emerald');
+                document.getElementById('exportPassphrase').value = '';
+                loadBackupList();
+            } else alert(res.error);
+        } catch(e) { alert('Backup failed.'); }
+    }
+    
+    async function importBackup() {
+        const passphrase = document.getElementById('importPassphrase').value;
+        const filename = document.getElementById('importFile').value;
+        if (!passphrase || !filename) return alert('Passphrase and file are required.');
+        if (!confirm('CRITICAL WARNING: This will completely overwrite your current vault. Are you sure?')) return;
+        try {
+            const res = await fetch('/api/backup/import', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({passphrase, filename}) }).then(r=>r.json());
+            if (res.success) {
+                showToast(res.message, 'emerald');
+                document.getElementById('importPassphrase').value = '';
+                loadAllVaultData();
+            } else alert(res.error);
+        } catch(e) { alert('Restore failed.'); }
+    }
+
+    async function loadBackupList() {
+        const res = await fetch('/api/backup/list').then(r=>r.json());
+        if (res.success) {
+            const sel = document.getElementById('importFile');
+            sel.innerHTML = '<option value="">Select Backup File...</option>';
+            res.files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f; opt.textContent = f;
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    // Initialize Icons
     lucide.createIcons();
     </script>
 </body>
