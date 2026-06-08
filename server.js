@@ -35,8 +35,16 @@ if (process.platform === 'win32' || process.pkg) {
 
         // Graceful teardown: kill Vault and remove extracted binary on exit
         process.on('exit', () => {
-            vaultDaemon.kill();
+            if (vaultDaemon) vaultDaemon.kill();
             try { if (fs.existsSync(externalVaultPath)) fs.unlinkSync(externalVaultPath); } catch (e) {}
+        });
+
+        ['SIGINT', 'SIGTERM', 'QUIT'].forEach(signal => {
+            process.on(signal, () => {
+                console.log(`[SHUTDOWN] Signal ${signal} caught. Halting Vault daemon...`);
+                if (vaultDaemon) vaultDaemon.kill('SIGTERM');
+                process.exit(0);
+            });
         });
     }
 }
@@ -50,6 +58,18 @@ app.post('/api/vault/save', async (req, res) => {
             { data: { store: JSON.stringify(data) } },
             { headers: { 'X-Vault-Token': vaultToken } }
         );
+
+        // Atomic File Write Backup
+        const dbPath = path.join(__dirname, 'vault-data.json');
+        const tmpPath = path.join(__dirname, 'vault-data.tmp');
+        let db = {};
+        if (fs.existsSync(dbPath)) {
+            db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+        }
+        db[type] = data;
+        fs.writeFileSync(tmpPath, JSON.stringify(db));
+        fs.renameSync(tmpPath, dbPath);
+
         res.json({ success: true, message: 'Vault sync operation succeeded.' });
     } catch (error) {
         res.status(500).json({ error: 'Vault database storage sync failure.' });
@@ -68,6 +88,22 @@ app.get('/api/vault/load/:type', async (req, res) => {
         res.json({ success: true, data: JSON.stringify(storedRaw) });
     } catch (error) {
         // Path not yet written — return empty collection gracefully
+        // Try to load from atomic file backup
+        try {
+            const dbPath = path.join(__dirname, 'vault-data.json');
+            if (fs.existsSync(dbPath)) {
+                const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+                if (db[type]) {
+                    // Restore to Vault
+                    axios.post(
+                        `${VAULT_ADDR}/v1/internal/data/app-passwords/${type}`,
+                        { data: { store: JSON.stringify(db[type]) } },
+                        { headers: { 'X-Vault-Token': vaultToken } }
+                    ).catch(() => {});
+                    return res.json({ success: true, data: JSON.stringify(db[type]) });
+                }
+            }
+        } catch(e) {}
         res.json({ success: true, data: '[]' });
     }
 });
