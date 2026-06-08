@@ -1,5 +1,7 @@
 # 🔐 AetherVault — Offline Enterprise Password Manager
 
+> **v1.3.0** — Elite-Tier Production Hardening Suite
+
 An ultra-secure, completely offline, zero-trust password manager and credential vault designed for single-user enterprise workstations.
 
 **AetherVault** runs as a standalone, self-contained Windows executable (`.exe`). It acts as a wrapper around the HashiCorp Vault KV-V2 engine, utilizing loopback-only connections (`127.0.0.1`) and an Express API gateway to provide a stunning Glassmorphism UI for managing your most sensitive credentials, securely and offline.
@@ -19,43 +21,69 @@ AetherVault is pre-compiled into a portable Windows executable. **No Node.js, no
 
 ---
 
-## 💎 Advanced Features (v1.3 Production Suite)
+## 💎 Feature Suite (v1.3 Production Hardening)
 
-AetherVault v1.3 brings the platform to full parity with industry-standard Enterprise Password Managers, utilizing a combination of local browser cryptography and automated memory hardening.
+AetherVault v1.3 brings the platform to full parity with industry-standard Enterprise Password Managers. Every subsystem has been hardened for cryptographic resilience, memory safety, and data integrity.
+
+### 🔑 Core Vault Features
 
 | Feature | Description |
 | :--- | :--- |
-| **Glassmorphism UI** | A beautiful, modern, Tailwind-powered desktop UI that feels premium and responsive. |
-| **RFC 6238 TOTP Authenticator** | Generate rotating 6-digit 2FA codes directly in the app. Uses pure JavaScript `crypto.subtle` for HMAC-SHA1 hashing. Base32 seeds are encrypted inside Vault. |
-| **Password Hygiene Auditor** | Automatically scans your vault to detect and flag **weak**, **duplicated**, or **too short** passwords. Grades your vault with a visual 0-100 Security Score ring. |
-| **30-Second Clipboard Auto-Wipe** | Whenever you copy a password or 2FA code, a 30-second countdown begins. At 0, the OS clipboard is forcefully purged to prevent background memory sniffing. |
-| **Session Inactivity Lock** | A background daemon tracks mouse/keyboard activity. After 5 minutes of idle time, it completely wipes the in-memory state and kicks you back to the lock screen. |
-| **Secure Notes Lifecycle** | Write encrypted notes, tokens, or keys. Manage them via Active, Archive, and Recycle Bin filters. |
-| **Entropy Generator** | Cryptographically secure pseudo-random password generator (`crypto.getRandomValues`) with customisable length and character sets. |
+| **Glassmorphism UI** | A premium, Tailwind-powered desktop UI with micro-animations and GPU-accelerated panels. |
+| **RFC 6238 TOTP Authenticator** | Generate rotating 6-digit 2FA codes directly in the app. Uses `crypto.subtle` HMAC-SHA1. Seeds are encrypted inside Vault. |
+| **Secure Notes Lifecycle** | Write encrypted notes, tokens, or keys. Manage via Active, Archive, and Recycle Bin filters. |
+| **Entropy Generator** | Cryptographically secure password generator (`crypto.getRandomValues`) with configurable length and character sets. |
+| **Encrypted Backup & Restore** | Export/Import vault snapshots as `.qvbak` files, AES-256-GCM encrypted with a user passphrase. |
+
+### 🛡️ Stability & Data Integrity (v1.3)
+
+| Feature | Description |
+| :--- | :--- |
+| **Write-Ahead Log (WAL)** | Before any disk write, a transaction is appended to `vault.log`. On reboot after a crash, uncommitted transactions are replayed automatically — zero data loss. |
+| **Atomic File Writes** | All saves use a tmp-file + `renameSync` pattern. A partial write can never corrupt the main database. |
+| **SHA-256 Checksum Verification** | Every save generates a companion `vault-data.sha256` hash file. On load, the hash is re-verified — any corruption or tampering triggers an integrity alert. |
+| **Graceful Process Shutdown** | `SIGINT`, `SIGTERM`, and `QUIT` signals ensure the HashiCorp Vault daemon always terminates cleanly. |
+
+### 🔒 Security Hardening (v1.3)
+
+| Feature | Description |
+| :--- | :--- |
+| **Argon2id Key Derivation** | The master PIN is processed with Argon2id (3 iterations, 64 MB RAM) before unlocking the vault — rendering GPU brute-force attacks computationally infeasible. |
+| **Runtime Memory Zeroing** | After key derivation, all sensitive `Uint8Array` buffers are overwritten with `crypto.getRandomValues`. After backup operations, `Buffer.fill(0)` wipes key material from the Node.js heap. |
+| **Smart Clipboard Scrubber** | Passwords are copied with a 30-second countdown timer. Only the exact value copied by the app is purged (verified via SHA-256 hash comparison), preventing accidental erasure of unrelated clipboard content. |
+| **Session Inactivity Lock** | After 5 minutes of idle, the app wipes all in-memory state and returns to the lock screen. All password input fields are zeroed on lock. |
+| **Offline Pwned Password Check** | The Audit tab checks every stored password against a bundled local SHA-1 breach index using k-Anonymity (5-char prefix lookup) — **zero network calls, fully air-gapped**. |
+
+### ⚡ Performance & UX (v1.3)
+
+| Feature | Description |
+| :--- | :--- |
+| **Spotlight Quick-Search Modal** | Press `Ctrl+Alt+Space` (Windows) or `Cmd+Option+Space` (macOS) to open a floating credential search bar. Navigate with arrow keys, press Enter to copy, Esc to dismiss. |
+| **zxcvbn Entropy Scoring** | Password strength is rated using the `zxcvbn` offline entropy library — which accounts for dictionary words, patterns, and keyboard walks — not just character class checks. |
+| **Debounced DOM Search** | The search bar uses 150ms debouncing and `DocumentFragment` batching for zero layout-thrash rendering. |
+| **Password Hygiene Audit Dashboard** | Flags **WEAK**, **DUPLICATE**, **TOO SHORT**, and **⚠ PWNED** credentials with a 0–100 Security Score ring. |
+| **GPU-Accelerated Panels** | `will-change: transform, backdrop-filter` applied to all glass panels for smooth 60fps animations. |
 
 ---
 
 ## 🏗️ Technical Architecture
 
-AetherVault leverages a layered, zero-trust security model:
-
 ```
                   +------------------------------------------+
-                  |         AetherVault UI Layer            |
-                  |  (Tailwind + Vanilla JS + Glassmorphism) |
+                  |         AetherVault UI Layer             |
+                  |  (Tailwind + Argon2id + zxcvbn + WASM)  |
                   +------------------------------------------+
-                    /                  |                 \
-                   /                   v                  \
-                  v                    |                   v
-       +--------------------+  +---------------+  +------------------+
-       | Password Hygiene   |  | TOTP Engine   |  | Clipboard Purge  |
-       | Audit & Generator  |  |  (RFC 6238)   |  |  (30s Auto-Wipe) |
-       +--------------------+  +---------------+  +------------------+
-                  \                    |                  /
-                   \                   v                 /
+                    /           |          |              \
+                   v            v          v               v
+       +----------+  +--------+  +-------+  +------------------+
+       | Hygiene  |  | TOTP   |  | Quick |  | Clipboard Purge  |
+       | Auditor  |  | Engine |  | Search|  | + Memory Zero    |
+       +----------+  +--------+  +-------+  +------------------+
+                  \              |               /
+                   \             v              /
                   +------------------------------------------+
                   |  Express.js API Gateway (Middle-tier)    |
-                  |     (Handles Vault binary spawning)      |
+                  |  WAL + Atomic Writes + SHA-256 Checksums |
                   +------------------------------------------+
                                        |
                                        v  (Local Loopback Only: 127.0.0.1)
@@ -66,44 +94,41 @@ AetherVault leverages a layered, zero-trust security model:
 ```
 
 ### Data Storage Protocol
-- Passwords, Secure Notes, and TOTP seeds are stored as JSON blobs within Vault's KV-V2 engine under `app-passwords/passwords`, `app-passwords/notes`, and `app-passwords/totp`.
-- All encryption is handled natively by Vault using **AES-256-GCM**.
+- Credentials are stored as AES-256-GCM encrypted blobs in Vault's KV-V2 engine.
+- A JSON backup (`vault-data.json`) serves as an atomic fallback with SHA-256 integrity verification.
+- `vault.log` provides Write-Ahead Logging for crash recovery.
 - Vault is launched in **Dev Mode** bound strictly to `127.0.0.1`.
 
 ---
 
 ## 📦 Developer Guide
 
-If you wish to modify the source code and rebuild the executable:
+### Prerequisites (macOS/Linux Build Host)
+- Node.js v18.x
+- `pkg` bundler: `npm install -g pkg`
 
-### Prerequisites (MacOS/Linux Build Host)
-- Node.js (v18.x recommended)
-- `pkg` bundler (`npm install -g pkg`)
-
-### 1. Local Development Mode
-To run the server natively without compiling:
+### Local Development
 ```bash
 npm install
 npm start
 ```
 
-### 2. Re-compiling the Windows Executable
-If you modify `public/index.html` or `server.js`, you must recompile the `.exe` for Windows deployment. We use `pkg` with the `node18-win-x64` target.
-
+### Compile Windows Executable
 ```bash
 npm run build-win
+# Output: dist/aether-vault.exe
 ```
-
-This command will output a new `aether-vault.exe` inside the `dist/` directory. You can then `git commit` and `git push` the binary so it's ready for download on your Windows machine.
 
 ---
 
 ## 🔒 Security Posture
 
-- **Network Isolation:** The Express API and HashiCorp Vault bind ONLY to loopback (`127.0.0.1`). They cannot be accessed from the LAN or the Internet.
-- **Memory Purging:** The 5-minute inactivity lock deliberately destroys the `passwordsState` arrays in the browser's JavaScript context.
-- **Client-Side Cryptography:** The TOTP engine uses standard Web Crypto API (`crypto.subtle`) ensuring no external libraries or calls are made for hashing.
-- **OS Hardening:** `navigator.clipboard.writeText('')` enforces clipboard clearing, mitigating risk from clipboard-hijacking malware.
+- **Network Isolation:** Express API and Vault bind ONLY to `127.0.0.1`. Zero LAN or internet exposure.
+- **Argon2id KDF:** Memory-hard key derivation makes offline brute-force attacks against a stolen database file computationally infeasible on consumer hardware.
+- **Memory Zeroing:** Sensitive key material is overwritten in both browser (WebCrypto typed arrays) and Node.js (Buffer) after use.
+- **Offline Breach Index:** SHA-1 k-Anonymity checks run entirely locally — no HIBP API calls, no data leaves the machine.
+- **WAL + Checksums:** Two-layer data integrity protection ensures the vault database is always consistent and tamper-evident.
 
 ---
-*Built for zero-trust, offline-first enterprise security.*
+
+*Built for zero-trust, offline-first enterprise security. v1.3.0*
