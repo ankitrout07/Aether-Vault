@@ -59,3 +59,10 @@ package-lock.json
 
 # Compiled binaries / distribution
 dist/
+
+# AetherVault Local Storage
+vault-data.json
+vault-data.tmp
+vault-data.sha256
+vault.log
+backups/

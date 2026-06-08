@@ -12,6 +12,56 @@ app.use(express.static(path.join(__dirname, 'public')));
 const VAULT_ADDR = 'http://127.0.0.1:8200';
 const vaultToken = 'root';
 
+const WAL_PATH = path.join(__dirname, 'vault.log');
+const DB_PATH = path.join(__dirname, 'vault-data.json');
+const CHECKSUM_PATH = path.join(__dirname, 'vault-data.sha256');
+
+function verifyChecksum() {
+    if (!fs.existsSync(DB_PATH)) return true;
+    if (!fs.existsSync(CHECKSUM_PATH)) return false;
+    const hash = crypto.createHash('sha256').update(fs.readFileSync(DB_PATH)).digest('hex');
+    const storedHash = fs.readFileSync(CHECKSUM_PATH, 'utf8').trim();
+    return hash === storedHash;
+}
+
+function updateChecksum() {
+    if (!fs.existsSync(DB_PATH)) return;
+    const hash = crypto.createHash('sha256').update(fs.readFileSync(DB_PATH)).digest('hex');
+    fs.writeFileSync(CHECKSUM_PATH, hash);
+}
+
+function recoverWAL() {
+    if (fs.existsSync(WAL_PATH)) {
+        const logData = fs.readFileSync(WAL_PATH, 'utf8').trim();
+        if (logData) {
+            console.log('[RECOVERY] Uncommitted transactions found in vault.log. Replaying...');
+            const lines = logData.split('\n');
+            let db = {};
+            if (fs.existsSync(DB_PATH)) {
+                try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch(e){}
+            }
+            let recovered = false;
+            lines.forEach(line => {
+                if(!line) return;
+                try {
+                    const tx = JSON.parse(line);
+                    db[tx.type] = tx.data;
+                    recovered = true;
+                } catch(e){}
+            });
+            if (recovered) {
+                const tmpPath = path.join(__dirname, 'vault-data.tmp');
+                fs.writeFileSync(tmpPath, JSON.stringify(db));
+                fs.renameSync(tmpPath, DB_PATH);
+                updateChecksum();
+                console.log('[RECOVERY] WAL transactions successfully replayed.');
+            }
+        }
+        fs.writeFileSync(WAL_PATH, '');
+    }
+}
+recoverWAL();
+
 // ─── Windows / pkg: Spawn bundled vault.exe as a background daemon ────────────
 if (process.platform === 'win32' || process.pkg) {
     const internalVaultPath = path.join(__dirname, 'bin', 'vault.exe');
@@ -59,16 +109,25 @@ app.post('/api/vault/save', async (req, res) => {
             { headers: { 'X-Vault-Token': vaultToken } }
         );
 
-        // Atomic File Write Backup
-        const dbPath = path.join(__dirname, 'vault-data.json');
+        // 1. Write Ahead Log (WAL)
+        const tx = JSON.stringify({ type, data, timestamp: Date.now() }) + '\n';
+        fs.appendFileSync(WAL_PATH, tx);
+
+        // 2. Atomic File Write Backup
         const tmpPath = path.join(__dirname, 'vault-data.tmp');
         let db = {};
-        if (fs.existsSync(dbPath)) {
-            db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+        if (fs.existsSync(DB_PATH)) {
+            db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
         }
         db[type] = data;
         fs.writeFileSync(tmpPath, JSON.stringify(db));
-        fs.renameSync(tmpPath, dbPath);
+        fs.renameSync(tmpPath, DB_PATH);
+
+        // 3. Update Checksum
+        updateChecksum();
+
+        // 4. Flush WAL
+        fs.writeFileSync(WAL_PATH, '');
 
         res.json({ success: true, message: 'Vault sync operation succeeded.' });
     } catch (error) {
@@ -90,9 +149,11 @@ app.get('/api/vault/load/:type', async (req, res) => {
         // Path not yet written — return empty collection gracefully
         // Try to load from atomic file backup
         try {
-            const dbPath = path.join(__dirname, 'vault-data.json');
-            if (fs.existsSync(dbPath)) {
-                const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+            if (fs.existsSync(DB_PATH)) {
+                if (!verifyChecksum()) {
+                    return res.status(500).json({ error: 'DATA_INTEGRITY_FAULT: Checksum verification failed. Database is corrupted.' });
+                }
+                const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
                 if (db[type]) {
                     // Restore to Vault
                     axios.post(
@@ -138,6 +199,9 @@ app.post('/api/backup/export', async (req, res) => {
         let encrypted = cipher.update(payload, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         const authTag = cipher.getAuthTag().toString('hex');
+        
+        // RUNTIME MEMORY ZEROING
+        key.fill(0);
 
         const backupData = JSON.stringify({
             salt: salt.toString('hex'),
@@ -170,6 +234,9 @@ app.post('/api/backup/import', async (req, res) => {
         decipher.setAuthTag(authTag);
         let decrypted = decipher.update(backupData.data, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
+        
+        // RUNTIME MEMORY ZEROING
+        key.fill(0);
 
         const payload = JSON.parse(decrypted);
 

@@ -9,9 +9,11 @@
     "build-win": "pkg . --targets node18-win-x64 --output dist/aether-vault.exe"
   },
   "dependencies": {
+    "argon2-browser": "^1.18.0",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
     "pkg": "^5.8.1"
