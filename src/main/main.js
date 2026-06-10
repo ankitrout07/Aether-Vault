@@ -36,12 +36,13 @@ process.env.AETHER_RESOURCES_DIR = app.isPackaged
 // We require() server.js directly — Electron's main process IS Node.js,
 // so there is no need to spawn a separate child process or rely on an
 // external `node` binary (which won't exist on the end-user's machine).
-require('./server');
+const serverModule = require('../server/server');
 
 // ─── Window management ───────────────────────────────────────────────────────
 let mainWindow = null;
 const SERVER_URL  = 'http://127.0.0.1:3000';
-const LOAD_SPLASH = path.join(__dirname, 'public', 'loading.html');
+const HEALTH_URL  = 'http://127.0.0.1:3000/api/health';
+const LOAD_SPLASH = path.join(__dirname, '..', 'renderer', 'html', 'loading.html');
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -68,8 +69,8 @@ function createWindow() {
         mainWindow.loadFile(LOAD_SPLASH);
     }
 
-    // Retry polling: attempt to reach the Express server before loading the app
-    waitForServer(SERVER_URL, 20, 300, () => {
+    // Retry polling: attempt to reach the Express server health endpoint before loading the app
+    waitForServer(HEALTH_URL, 20, 300, () => {
         if (mainWindow) mainWindow.loadURL(SERVER_URL);
     });
 
@@ -110,4 +111,11 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
     // On macOS apps conventionally stay alive until Cmd+Q
     if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+    // Cleanly kill the HashiCorp Vault background daemon if it was started
+    if (serverModule && serverModule.vaultDaemon) {
+        serverModule.vaultDaemon.kill('SIGTERM');
+    }
 });
