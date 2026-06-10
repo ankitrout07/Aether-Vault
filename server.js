@@ -7,14 +7,21 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
+// Public assets are bundled read-only snapshots — __dirname is correct here
 app.use(express.static(path.join(__dirname, 'public')));
 
 const VAULT_ADDR = 'http://127.0.0.1:8200';
 const vaultToken = 'root';
 
-const WAL_PATH = path.join(__dirname, 'vault.log');
-const DB_PATH = path.join(__dirname, 'vault-data.json');
-const CHECKSUM_PATH = path.join(__dirname, 'vault-data.sha256');
+// When compiled with pkg, __dirname is a read-only virtual snapshot inside the .exe.
+// All writable data files must live next to the .exe on the real filesystem.
+const DATA_DIR = process.pkg
+    ? path.dirname(process.execPath)
+    : __dirname;
+
+const WAL_PATH      = path.join(DATA_DIR, 'vault.log');
+const DB_PATH       = path.join(DATA_DIR, 'vault-data.json');
+const CHECKSUM_PATH = path.join(DATA_DIR, 'vault-data.sha256');
 
 function verifyChecksum() {
     if (!fs.existsSync(DB_PATH)) return true;
@@ -31,6 +38,10 @@ function updateChecksum() {
 }
 
 function recoverWAL() {
+    // Ensure the data directory exists before trying to read/write files
+    if (!fs.existsSync(DATA_DIR)) {
+        try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
+    }
     if (fs.existsSync(WAL_PATH)) {
         const logData = fs.readFileSync(WAL_PATH, 'utf8').trim();
         if (logData) {
@@ -50,7 +61,7 @@ function recoverWAL() {
                 } catch(e){}
             });
             if (recovered) {
-                const tmpPath = path.join(__dirname, 'vault-data.tmp');
+                const tmpPath = path.join(DATA_DIR, 'vault-data.tmp');
                 fs.writeFileSync(tmpPath, JSON.stringify(db));
                 fs.renameSync(tmpPath, DB_PATH);
                 updateChecksum();
@@ -65,7 +76,8 @@ recoverWAL();
 // ─── Windows / pkg: Spawn bundled vault.exe as a background daemon ────────────
 if (process.platform === 'win32' || process.pkg) {
     const internalVaultPath = path.join(__dirname, 'bin', 'vault.exe');
-    const externalVaultPath = path.join(process.cwd(), 'vault-runtime.exe');
+    // Extract vault-runtime.exe next to the .exe so it's on the real writable filesystem
+    const externalVaultPath = path.join(DATA_DIR, 'vault-runtime.exe');
 
     // Extract vault binary from pkg bundle on first run
     if (!fs.existsSync(externalVaultPath) && fs.existsSync(internalVaultPath)) {
@@ -118,7 +130,7 @@ app.post('/api/vault/save', async (req, res) => {
         fs.appendFileSync(WAL_PATH, tx);
 
         // 2. Atomic File Write Backup
-        const tmpPath = path.join(__dirname, 'vault-data.tmp');
+        const tmpPath = path.join(DATA_DIR, 'vault-data.tmp');
         let db = {};
         if (fs.existsSync(DB_PATH)) {
             db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -173,9 +185,10 @@ app.get('/api/vault/load/:type', async (req, res) => {
     }
 });
 
-// ─── Backup Endpoints ──────────────────────────────────────────────────────────
-const BACKUP_DIR = path.join(__dirname, 'backups');
-if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
+// ─── Backup Endpoints ────────────────────────────────────────────────────────
+// Backups also go next to the exe / working dir — not inside the read-only snapshot
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
 function deriveKey(passphrase, salt) {
     return crypto.pbkdf2Sync(passphrase, salt, 100000, 32, 'sha256');
