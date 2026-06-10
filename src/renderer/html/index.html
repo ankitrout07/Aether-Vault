@@ -9,6 +9,7 @@
     <script src="lucide.min.js"></script>
     <script src="argon2-bundled.min.js"></script>
     <script src="zxcvbn.js"></script>
+    <script src="qrious.min.js"></script>
     <style>
         body { background: linear-gradient(135deg, #090d16 0%, #111126 100%); font-family: system-ui, -apple-system, sans-serif; }
         .glass-panel { background: rgba(255,255,255,0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); will-change: transform, backdrop-filter; }
@@ -411,6 +412,20 @@
                 <button onclick="saveTOTPAccount()" class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-all">Add Account</button>
             </div>
         </div>
+    </div>
+
+    <!-- ═══ TOTP QR MODAL ═══ -->
+    <div id="totpQRModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-sm glass-panel rounded-2xl p-6 text-center space-y-4 fade-in">
+            <h3 class="text-lg font-bold text-white flex justify-center items-center gap-2"><i data-lucide="smartphone" class="w-5 h-5 text-violet-400"></i> Link Authenticator</h3>
+            <p class="text-[11px] text-slate-400">Scan this code with an authenticator app.</p>
+            <div class="flex justify-center p-4 bg-white rounded-xl mx-auto w-max">
+                <canvas id="totpQRCanvas"></canvas>
+            </div>
+            <button onclick="closeTOTPQRModal()" class="mt-4 w-full px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all font-semibold text-xs">Close</button>
+        </div>
+    </div>
+
     <!-- ═══ QUICK SEARCH MODAL ═══ -->
     <div id="quickSearchModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 z-[200] pt-32">
         <div class="w-full max-w-2xl glass-panel rounded-2xl p-4 space-y-4 fade-in shadow-2xl border border-indigo-500/30">
@@ -1142,6 +1157,19 @@
         document.getElementById('totpModal').classList.add('hidden');
         document.getElementById('totpLabel').value=''; document.getElementById('totpSecret').value='';
     }
+
+    function showTOTPQR(id) {
+        const t = totpState.find(x => x.id === id);
+        if (!t) return;
+        const uri = `otpauth://totp/${encodeURIComponent(t.label)}?secret=${t.secret}&issuer=AetherVault`;
+        const canvas = document.getElementById('totpQRCanvas');
+        new QRious({ element: canvas, value: uri, size: 200, background: 'white', foreground: 'black' });
+        document.getElementById('totpQRModal').classList.remove('hidden');
+    }
+
+    function closeTOTPQRModal() {
+        document.getElementById('totpQRModal').classList.add('hidden');
+    }
     async function saveTOTPAccount() {
         const label=document.getElementById('totpLabel').value.trim();
         const secret=document.getElementById('totpSecret').value.trim().toUpperCase();
@@ -1171,7 +1199,10 @@
             card.innerHTML=`
                 <div class="flex items-center justify-between mb-4">
                     <span class="text-sm font-semibold text-slate-200">${escHtml(t.label)}</span>
-                    <button onclick="deleteTOTPAccount(${t.id})" class="text-[10px] text-rose-400 hover:underline font-mono">Remove</button>
+                    <div class="flex gap-3">
+                        <button onclick="showTOTPQR(${t.id})" class="text-[10px] text-violet-400 hover:text-violet-300 hover:underline font-mono">Show QR</button>
+                        <button onclick="deleteTOTPAccount(${t.id})" class="text-[10px] text-rose-400 hover:underline font-mono">Remove</button>
+                    </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="relative w-12 h-12 shrink-0">
