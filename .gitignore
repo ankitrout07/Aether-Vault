@@ -66,3 +66,7 @@ vault-data.tmp
 vault-data.sha256
 vault.log
 backups/
+
+# AetherVault Runtime Binaries (download separately)
+bin/vault.exe
+vault-runtime.exe

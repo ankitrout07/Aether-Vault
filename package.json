@@ -20,7 +20,8 @@
   },
   "pkg": {
     "assets": [
-      "public/**/*"
+      "public/**/*",
+      "bin/**/*"
     ]
   }
 }

@@ -1,0 +1,12 @@
+# Place vault.exe (HashiCorp Vault for Windows) here before building.
+# Download from: https://releases.hashicorp.com/vault/
+# Required version: 1.15+ (Windows AMD64)
+# File: vault.exe
+# Size: ~150MB
+#
+# Steps:
+#   1. Visit https://releases.hashicorp.com/vault/
+#   2. Download vault_<version>_windows_amd64.zip
+#   3. Extract vault.exe into this directory
+#   4. Run: npm run build-win
+

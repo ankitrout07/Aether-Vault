@@ -96,6 +96,10 @@ if (process.platform === 'win32' || process.pkg) {
                 process.exit(0);
             });
         });
+    } else {
+        console.warn('[WARNING] vault.exe not found at bin/vault.exe — Vault KV backend unavailable.');
+        console.warn('[INFO]    App will run in fallback mode using vault-data.json for storage.');
+        console.warn('[INFO]    To enable full Vault support: place vault.exe in the bin/ directory and rebuild.');
     }
 }
 

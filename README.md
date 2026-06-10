@@ -10,14 +10,27 @@ An ultra-secure, completely offline, zero-trust password manager and credential 
 
 ## 🚀 Quick Start (Windows Setup)
 
-AetherVault is pre-compiled into a portable Windows executable. **No Node.js, no Docker, and no external dependencies are required to run it.**
+AetherVault is pre-compiled into a portable Windows executable. **No Node.js, no Docker are required to run it.**
 
-1. **Pull this repository** onto your Windows workstation.
-2. Navigate to the `dist/` folder: `dist/aether-vault.exe`
-3. **Double-click `aether-vault.exe`**.
+### Prerequisites — Download HashiCorp Vault Binary
+
+> **This is required.** The app bundles and auto-launches the HashiCorp Vault engine for secure KV storage.
+
+1. Visit [https://releases.hashicorp.com/vault/](https://releases.hashicorp.com/vault/)
+2. Download **`vault_<latest>_windows_amd64.zip`**
+3. Extract and place **`vault.exe`** into the **`bin/`** directory of this repo
+4. Run **`npm run build-win`** to compile the final `.exe` with vault bundled
+
+### Running the Pre-Built Executable
+
+Once you have the `.exe` (with vault.exe bundled):
+
+1. Navigate to the `dist/` folder: `dist/aether-vault.exe`
+2. **Double-click `aether-vault.exe`**.
     - This will silently spawn the background HashiCorp Vault daemon and the Express middleware server.
-4. **Open your web browser** and go to: `http://127.0.0.1:3000`
-5. **Enter the Master PIN (`2026`)** to unlock your vault.
+3. **Open your web browser** and go to: `http://127.0.0.1:3000`
+4. **Enter the Master PIN (`2026`)** to unlock your vault.
+
 
 ---
 
@@ -71,7 +84,7 @@ AetherVault v1.3 brings the platform to full parity with industry-standard Enter
 ```
                   +------------------------------------------+
                   |         AetherVault UI Layer             |
-                  |  (Tailwind + Argon2id + zxcvbn + WASM)  |
+                  |  (Tailwind + Argon2id + zxcvbn + WASM)   |
                   +------------------------------------------+
                     /           |          |              \
                    v            v          v               v
