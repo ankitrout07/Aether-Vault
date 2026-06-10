@@ -13,11 +13,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 const VAULT_ADDR = 'http://127.0.0.1:8200';
 const vaultToken = 'root';
 
-// When compiled with pkg, __dirname is a read-only virtual snapshot inside the .exe.
-// All writable data files must live next to the .exe on the real filesystem.
-const DATA_DIR = process.pkg
-    ? path.dirname(process.execPath)
-    : __dirname;
+// ─── Data directory resolution ──────────────────────────────────────────────
+// Priority: AETHER_DATA_DIR (set by Electron main.js)
+//         → process.pkg (pkg bundled exe, use dir next to the exe)
+//         → __dirname   (dev mode: node server.js)
+const DATA_DIR = process.env.AETHER_DATA_DIR
+    || (process.pkg ? path.dirname(process.execPath) : __dirname);
 
 const WAL_PATH      = path.join(DATA_DIR, 'vault.log');
 const DB_PATH       = path.join(DATA_DIR, 'vault-data.json');
@@ -75,7 +76,9 @@ recoverWAL();
 
 // ─── Windows / pkg: Spawn bundled vault.exe as a background daemon ────────────
 if (process.platform === 'win32' || process.pkg) {
-    const internalVaultPath = path.join(__dirname, 'bin', 'vault.exe');
+    // vault.exe can live in bin/ (dev/pkg) or in process.resourcesPath (Electron packaged)
+    const resourcesDir = process.env.AETHER_RESOURCES_DIR || __dirname;
+    const internalVaultPath = path.join(resourcesDir, 'bin', 'vault.exe');
     // Extract vault-runtime.exe next to the .exe so it's on the real writable filesystem
     const externalVaultPath = path.join(DATA_DIR, 'vault-runtime.exe');
 

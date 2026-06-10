@@ -2,11 +2,13 @@
   "name": "aether-vault",
   "version": "1.3.0",
   "description": "Secure Offline Password Manager and Desktop Vault",
-  "main": "server.js",
-  "bin": "server.js",
+  "main": "main.js",
   "scripts": {
     "start": "node server.js",
-    "build-win": "pkg . --targets node18-win-x64 --output dist/aether-vault.exe"
+    "desktop": "electron .",
+    "build-win": "electron-builder --win portable --x64",
+    "build-win-installer": "electron-builder --win nsis --x64",
+    "build-pkg": "pkg server.js --targets node18-win-x64 --output dist/aether-vault-server.exe"
   },
   "dependencies": {
     "argon2-browser": "^1.18.0",
@@ -16,7 +18,53 @@
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2",
     "pkg": "^5.8.1"
+  },
+  "build": {
+    "appId": "io.aethervault.desktop",
+    "productName": "AetherVault",
+    "copyright": "AetherVault v1.3.0 — Offline Secure Suite",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "public/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/electron/**/*",
+      "!node_modules/electron-builder/**/*",
+      "!node_modules/pkg/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/",
+        "to": "bin/",
+        "filter": ["vault.exe"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "portable": {
+      "artifactName": "AetherVault-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "AetherVault-${version}-setup.exe"
+    }
   },
   "pkg": {
     "assets": [

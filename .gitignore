@@ -70,3 +70,8 @@ backups/
 # AetherVault Runtime Binaries (download separately)
 bin/vault.exe
 vault-runtime.exe
+
+# Electron build outputs
+dist-electron/
+.electron-builder-cache/
+
