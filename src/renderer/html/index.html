@@ -11,15 +11,80 @@
     <script src="zxcvbn.js"></script>
     <script src="qrious.min.js"></script>
     <style>
-        body { background: linear-gradient(135deg, #090d16 0%, #111126 100%); font-family: system-ui, -apple-system, sans-serif; }
-        .glass-panel { background: rgba(255,255,255,0.02); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); will-change: transform, backdrop-filter; }
-        .strength-bar { transition: width 0.4s ease, background-color 0.4s ease; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        .fade-in { animation: fadeIn 0.25s ease forwards; }
-        @keyframes toastIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
-        .toast-in { animation: toastIn 0.3s ease forwards; }
-        .ring-track { fill:none; stroke:rgba(255,255,255,0.06); }
-        .ring-progress { fill:none; stroke-linecap:round; transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset 1s linear, stroke 0.5s ease; }
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        
+        body { 
+            background-color: #050505;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.12), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.12), transparent 25%);
+            background-attachment: fixed;
+            font-family: 'Outfit', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        }
+        
+        /* Animated Orbs */
+        body::before, body::after {
+            content: ''; position: fixed; border-radius: 50%; filter: blur(100px); z-index: -1; pointer-events: none;
+            animation: orbFloat 20s infinite alternate ease-in-out;
+        }
+        body::before { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); }
+        body::after { bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%); animation-delay: -10s; }
+        
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(5%, 5%) scale(1.1); }
+        }
+
+        .glass-panel { 
+            background: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(24px); 
+            -webkit-backdrop-filter: blur(24px); 
+            border: 1px solid rgba(255,255,255,0.05); 
+            border-top: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            will-change: transform, backdrop-filter; 
+        }
+        
+        /* Sidebar Tab Animations */
+        .tab-btn { position: relative; overflow: hidden; }
+        .tab-btn::before { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 3px; background: #6366f1; transform: scaleY(0); transition: transform 0.3s ease; transform-origin: left; }
+        .tab-btn:hover::before { transform: scaleY(1); }
+        .tab-btn:hover { background: linear-gradient(90deg, rgba(99,102,241,0.1) 0%, transparent 100%); transform: translateX(4px); }
+
+        /* Universal Button Polish */
+        button { position: relative; overflow: hidden; }
+        button::after {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(30deg) translateX(-100%); transition: transform 0.6s ease; z-index: -1; pointer-events: none;
+        }
+        button:hover::after { transform: rotate(30deg) translateX(100%); }
+
+        /* Universal Input Polish */
+        input[type="text"], input[type="password"], textarea, select {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.25), inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .strength-bar { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease; }
+        
+        @keyframes fadeIn { from { opacity:0; transform:translateY(12px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes toastIn { from { opacity:0; transform:translateX(24px) scale(0.95); } to { opacity:1; transform:translateX(0) scale(1); } }
+        .toast-in { animation: toastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes heartbeat { 
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(99,102,241,0.6)); } 
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 16px rgba(99,102,241,0.9)); } 
+        }
+        .heartbeat { animation: heartbeat 2s ease-in-out infinite; }
+        
+        .ring-track { fill:none; stroke:rgba(255,255,255,0.03); }
+        .ring-progress { fill:none; stroke-linecap:round; transform:rotate(-90deg); transform-origin:50% 50%; transition:stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1), stroke 0.5s ease; filter: drop-shadow(0 0 4px currentColor); }
     </style>
 </head>
 <body class="min-h-screen text-slate-200 flex items-center justify-center p-4">
@@ -34,7 +99,7 @@
 
     <!-- ══════════════════ LOCK GATE ══════════════════ -->
     <div id="lockScreen" class="w-full max-w-sm glass-panel rounded-2xl p-10 text-center shadow-2xl fade-in">
-        <div class="inline-flex p-4 rounded-full bg-indigo-500/10 text-indigo-400 mb-5 animate-pulse">
+        <div class="inline-flex p-4 rounded-full bg-indigo-500/15 text-indigo-400 mb-5 heartbeat shadow-[0_0_30px_rgba(99,102,241,0.3)]">
             <i data-lucide="shield-alert" class="w-12 h-12"></i>
         </div>
         <h2 class="text-2xl font-bold text-white mb-1 tracking-widest uppercase">AetherVault</h2>
