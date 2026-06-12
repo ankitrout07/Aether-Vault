@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LockScreen from './components/LockScreen';
-import { loadAllVaultData } from './utils/api';
+import { loadAllVaultData } from './utils/vault-utils';
 
 function App() {
   const [vaultMasterKey, setVaultMasterKey] = useState(null);

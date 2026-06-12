@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Unlock, Fingerprint, Loader } from 'lucide-react';
-import { deriveMasterKey } from '../utils/crypto';
-import { unlockWithBiometrics } from '../utils/biometrics';
+import { deriveMasterKey, unlockWithBiometrics } from '../utils/vault-utils';
 
 export default function LockScreen({ onUnlock }) {
     const [pinCode, setPinCode] = useState('');
