@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, shell, nativeTheme, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const http  = require('http');
 const fs    = require('fs');
@@ -40,6 +40,8 @@ const serverModule = require('../server/server');
 
 // ─── Window management ───────────────────────────────────────────────────────
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 const SERVER_URL  = 'http://127.0.0.1:3000';
 const HEALTH_URL  = 'http://127.0.0.1:3000/api/health';
 const LOAD_SPLASH = path.join(__dirname, '..', 'renderer', 'html', 'loading.html');
@@ -81,6 +83,13 @@ function createWindow() {
         return { action: 'deny' };
     });
 
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
+
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -101,6 +110,35 @@ function waitForServer(url, retries, intervalMs, onReady) {
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 app.whenReady().then(() => {
     createWindow();
+
+    // ─── System Tray Integration ─────────────────────────────────────────────────
+    const iconBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAXSURBVDhPY/zPwAAAAAMAg0yFmH8AAAAASUVORK5CYII=';
+    const icon = nativeImage.createFromDataURL(iconBase64);
+    tray = new Tray(icon);
+    
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Show AetherVault', click: () => { if (mainWindow) mainWindow.show(); } },
+        { label: 'Lock Vault', click: () => { 
+            if (mainWindow) {
+                mainWindow.webContents.executeJavaScript('if (typeof lockVault === "function") lockVault();');
+            }
+        }},
+        { type: 'separator' },
+        { label: 'Quit AetherVault', click: () => { 
+            isQuitting = true; 
+            app.quit(); 
+        }}
+    ]);
+    
+    tray.setToolTip('AetherVault');
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => { if (mainWindow) mainWindow.show(); });
+
+    // ─── Auto-Start on Login ─────────────────────────────────────────────────────
+    app.setLoginItemSettings({
+        openAtLogin: true,
+        path: app.getPath('exe')
+    });
 
     // macOS: re-create the window when the dock icon is clicked
     app.on('activate', () => {
