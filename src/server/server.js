@@ -14,9 +14,7 @@ try { axios = require('axios'); } catch(e) {}
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 // Serve UI layers from the renderer directory
-app.use(express.static(path.join(__dirname, '..', 'renderer', 'html')));
-app.use(express.static(path.join(__dirname, '..', 'renderer', 'assets')));
-app.use(express.static(path.join(__dirname, '..', 'renderer', 'data')));
+app.use(express.static(path.join(__dirname, '..', 'renderer', 'dist')));
 
 const VAULT_ADDR  = 'http://127.0.0.1:8200';
 const VAULT_TOKEN = 'root';

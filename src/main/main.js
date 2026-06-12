@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, shell, nativeTheme, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, shell, nativeTheme, Tray, Menu, nativeImage, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const http  = require('http');
 const fs    = require('fs');
@@ -46,6 +46,34 @@ const SERVER_URL  = 'http://127.0.0.1:3000';
 const HEALTH_URL  = 'http://127.0.0.1:3000/api/health';
 const LOAD_SPLASH = path.join(__dirname, '..', 'renderer', 'html', 'loading.html');
 
+const bioPath = path.join(DATA_DIR, 'bio-config.enc');
+
+ipcMain.handle('bio:available', () => {
+    return safeStorage.isEncryptionAvailable();
+});
+
+ipcMain.handle('bio:store', (event, pin) => {
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    try {
+        const encrypted = safeStorage.encryptString(pin);
+        fs.writeFileSync(bioPath, encrypted);
+        return true;
+    } catch(e) { return false; }
+});
+
+ipcMain.handle('bio:hasKey', () => {
+    return safeStorage.isEncryptionAvailable() && fs.existsSync(bioPath);
+});
+
+ipcMain.handle('bio:get', (event) => {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    try {
+        if (!fs.existsSync(bioPath)) return null;
+        const encrypted = fs.readFileSync(bioPath);
+        return safeStorage.decryptString(encrypted);
+    } catch(e) { return null; }
+});
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width:            1280,
@@ -58,6 +86,7 @@ function createWindow() {
         // Custom frameless feel — keep native frame for draggability
         titleBarStyle:    process.platform === 'darwin' ? 'hiddenInset' : 'default',
         webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration:  false,
             contextIsolation: true,
             sandbox:          true,
